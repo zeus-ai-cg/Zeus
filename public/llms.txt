@@ -1,0 +1,20 @@
+# Zeus AI
+
+> Zeus AI is your personal AI coding guru — a patient, multilingual programming mentor that teaches developers from absolute beginner to advanced engineer.
+
+Zeus AI explains concepts step-by-step, debugs code, mentors real projects, and prepares engineers for interviews. It adapts to each learner's level across 20+ programming languages.
+
+## Pages
+
+- [Home](/): What Zeus AI is and how it helps you learn to code.
+- [Pricing](/pricing): Free plan (20 questions / 12h) and Pro at $5/month.
+- [About](/about): Mission, values, and the team behind Zeus AI.
+- [FAQ](/faq): Common questions about features, plans, and refunds.
+- [Blog](/blog): Articles on learning programming with AI.
+- [Contact](/contact): How to reach the Zeus AI team.
+
+## Optional
+
+- [Privacy Policy](/privacy): How we collect and protect your data.
+- [Terms of Service](/terms): The terms governing use of Zeus AI.
+- [Refund Policy](/refund): 30-day money-back guarantee details.

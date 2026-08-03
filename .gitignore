@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Env files — never commit real secrets. .env.example is fine to commit.
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+.output/
+.vercel/
+.vinxi/
+build/
+
+# Vite / TanStack Start
+.tanstack/
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Supabase local dev
+supabase/.branches
+supabase/.temp
