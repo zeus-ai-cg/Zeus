@@ -12,7 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FaqRouteImport } from './routes/faq'
@@ -35,6 +35,8 @@ import { Route as AuthenticatedWorkspaceRouteImport } from './routes/_authentica
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiEngineerRouteImport } from './routes/api/engineer'
 import { Route as ApiWebhooksRouteImport } from './routes/api/webhooks'
+import { Route as AuthIndexRouteImport } from './routes/auth/index'
+import { Route as AuthDesktopRouteImport } from './routes/auth/desktop'
 import { Route as BillingCancelRouteImport } from './routes/billing.cancel'
 import { Route as BillingSuccessRouteImport } from './routes/billing.success'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated/chat.index'
@@ -56,7 +58,7 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
+const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
   path: '/auth',
   getParentRoute: () => rootRouteImport,
@@ -172,6 +174,16 @@ const ApiWebhooksRoute = ApiWebhooksRouteImport.update({
   path: '/api/webhooks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthIndexRoute = AuthIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthDesktopRoute = AuthDesktopRouteImport.update({
+  id: '/desktop',
+  path: '/desktop',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const BillingCancelRoute = BillingCancelRouteImport.update({
   id: '/billing/cancel',
   path: '/billing/cancel',
@@ -206,8 +218,8 @@ const ApiLemonsqueezyCheckoutRoute = ApiLemonsqueezyCheckoutRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRouteRouteWithChildren
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
@@ -230,8 +242,10 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/engineer': typeof ApiEngineerRoute
   '/api/webhooks': typeof ApiWebhooksRoute
+  '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/auth/': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
@@ -240,7 +254,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
@@ -263,8 +276,10 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/engineer': typeof ApiEngineerRoute
   '/api/webhooks': typeof ApiWebhooksRoute
+  '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/auth': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
@@ -274,8 +289,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRouteRouteWithChildren
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
@@ -298,8 +313,10 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/engineer': typeof ApiEngineerRoute
   '/api/webhooks': typeof ApiWebhooksRoute
+  '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/auth/': typeof AuthIndexRoute
   '/_authenticated/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
@@ -309,8 +326,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/about'
     | '/auth'
+    | '/about'
     | '/blog'
     | '/contact'
     | '/faq'
@@ -333,8 +350,10 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/engineer'
     | '/api/webhooks'
+    | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/auth/'
     | '/chat/$threadId'
     | '/api/context/$token'
     | '/api/lemonsqueezy/checkout'
@@ -343,7 +362,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/auth'
     | '/blog'
     | '/contact'
     | '/faq'
@@ -366,8 +384,10 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/engineer'
     | '/api/webhooks'
+    | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/auth'
     | '/chat/$threadId'
     | '/api/context/$token'
     | '/api/lemonsqueezy/checkout'
@@ -376,8 +396,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/about'
     | '/auth'
+    | '/about'
     | '/blog'
     | '/contact'
     | '/faq'
@@ -400,8 +420,10 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/engineer'
     | '/api/webhooks'
+    | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/auth/'
     | '/_authenticated/chat/$threadId'
     | '/api/context/$token'
     | '/api/lemonsqueezy/checkout'
@@ -411,8 +433,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRouteRoute: typeof AuthRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
-  AuthRoute: typeof AuthRoute
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
@@ -458,7 +480,7 @@ declare module '@tanstack/react-router' {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+      preLoaderRoute: typeof AuthRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blog': {
@@ -615,6 +637,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/': {
+      id: '/auth/'
+      path: '/'
+      fullPath: '/auth/'
+      preLoaderRoute: typeof AuthIndexRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/desktop': {
+      id: '/auth/desktop'
+      path: '/desktop'
+      fullPath: '/auth/desktop'
+      preLoaderRoute: typeof AuthDesktopRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/billing/cancel': {
       id: '/billing/cancel'
       path: '/billing/cancel'
@@ -693,11 +729,25 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteRouteChildren {
+  AuthDesktopRoute: typeof AuthDesktopRoute
+  AuthIndexRoute: typeof AuthIndexRoute
+}
+
+const AuthRouteRouteChildren: AuthRouteRouteChildren = {
+  AuthDesktopRoute: AuthDesktopRoute,
+  AuthIndexRoute: AuthIndexRoute,
+}
+
+const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
+  AuthRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRouteRoute: AuthRouteRouteWithChildren,
   AboutRoute: AboutRoute,
-  AuthRoute: AuthRoute,
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,

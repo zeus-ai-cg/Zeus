@@ -8,11 +8,13 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getDesktopAuthBridge } from "@/lib/desktop-auth";
 import { resetAuthSessionCache } from "@/lib/auth-session";
 import { ThemeProvider } from "@/lib/theme";
 import { SITE_URL } from "@/lib/site";
@@ -192,6 +194,30 @@ function RootComponent() {
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
+  // Desktop shell: the main process completes Google sign-in in the system
+  // browser and hands the session back over IPC (zeusai:// deep link). Apply
+  // it to the existing Supabase client on ANY page — the same localStorage
+  // session the web app uses, so "stay signed in" works identically.
+  useEffect(() => {
+    const desktop = getDesktopAuthBridge();
+    if (!desktop) return;
+
+    let mounted = true;
+    const apply = async (result: { access_token?: string } | null) => {
+      if (!mounted || !result || typeof result.access_token !== "string") return;
+      await supabase.auth.setSession(result as Session);
+      // setSession fires SIGNED_IN -> the onAuthStateChange listener above
+      // resets caches and invalidates the router automatically.
+    };
+
+    desktop.getPendingSession().then(apply);
+    const unsubscribe = desktop.onSessionReady(apply);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,0 +1,638 @@
+// Electron main process — Zeus AI desktop shell.
+//
+// The app is a TanStack Start + Nitro SSR application. Instead of converting it
+// to a static SPA, this wrapper keeps the server-rendered architecture intact:
+//
+//   - dev:      spawns the Vite dev server (`vite dev`), waits for it to answer,
+//               then loads it in the window.
+//   - packaged: spawns the production Nitro server (`.output/server/index.mjs`)
+//               built with the `node-server` preset, waits for it, then loads it.
+//
+// The server child is always killed when the app quits, so no orphan processes
+// are left behind.
+
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { execFile, spawn } from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import net from "node:net";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const APP_ID = "com.zeusai.desktop";
+const isDev = !app.isPackaged;
+
+// Dev: the lovable TanStack config serves `vite dev` on 8080 by default.
+// Packaged: pick an uncommon base port to avoid colliding with other apps.
+const DEV_PORT_START = 8080;
+const PROD_PORT_START = 3896;
+// Generous: the TanStack dev server can take ~1-2 min to cold-compile on first boot.
+const READY_TIMEOUT_MS = 300_000;
+// Startup crashes (e.g. another process grabbing the port between probe and bind)
+// are retried automatically on a fresh port.
+const MAX_START_ATTEMPTS = 3;
+
+// Desktop OAuth — Google sign-in via the system browser.
+//
+// The app registers a `zeusai://` protocol. The main process opens the
+// system browser at the app's dedicated `/auth/desktop` page (PKCE), the
+// user confirms the device there (and signs in if needed), the page
+// redirects into Supabase's Google authorize endpoint, and Supabase
+// redirects back to `zeusai://auth/callback?code=...`. The main process
+// exchanges that code for a session and hands it to the renderer over IPC —
+// the renderer then feeds it into the existing Supabase client (same
+// localStorage session the web app uses). No secret is ever stored in the
+// renderer; the PKCE verifier lives only in this process. A user-declined
+// flow arrives as `zeusai://auth/cancel`.
+const APP_PROTOCOL = "zeusai";
+const AUTH_CALLBACK_URL = `${APP_PROTOCOL}://auth/callback`;
+const AUTH_CANCEL_URL = `${APP_PROTOCOL}://auth/cancel`;
+const OAUTH_TTL_MS = 10 * 60 * 1000; // verifier is single-use and expires
+
+let pendingOAuth = null; // { verifier, expiresAt } for the in-flight flow
+let pendingSession = null; // exchanged session, awaiting renderer pickup
+
+let mainWindow = null;
+let serverProcess = null;
+let serverPort = null;
+let quitting = false;
+
+/* ── small helpers ──────────────────────────────────────────────── */
+
+// Minimal .env parser (KEY=value, quoted values, # comments).
+function loadEnvFile(filePath) {
+  const out = {};
+  let text;
+  try {
+    text = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return out;
+  }
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    line = line.replace(/^export\s+/, "");
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    const first = value[0];
+    if (first === '"' && value.endsWith('"')) value = value.slice(1, -1);
+    else if (first === "'" && value.endsWith("'")) value = value.slice(1, -1);
+    else value = value.split(/\s+#/)[0].trim(); // strip trailing inline comments
+    out[key] = value;
+  }
+  return out;
+}
+
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, "127.0.0.1");
+  });
+}
+
+async function findFreePort(start) {
+  for (let port = start; port < start + 200; port++) {
+    if (await isPortFree(port)) return port;
+  }
+  throw new Error(`No free port available starting at ${start}`);
+}
+
+// Poll the server until it answers HTTP (SSR page compiles on first request,
+// so a plain TCP connect is not enough).
+async function waitForServer(port, timeoutMs) {
+  const url = `http://127.0.0.1:${port}/`;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!serverProcess) return false;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+      if (res.status < 500) return true;
+    } catch {
+      // not ready yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return false;
+}
+
+// Windows: taskkill kills the whole tree (vite/esbuild spawn children).
+function killProcessTree(child) {
+  if (!child || child.killed) return;
+  if (process.platform === "win32") {
+    try {
+      execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], () => {});
+    } catch {
+      try {
+        child.kill();
+      } catch {}
+    }
+  } else {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch {
+      try {
+        child.kill();
+      } catch {}
+    }
+  }
+}
+
+function stopServer() {
+  if (!serverProcess) return;
+  killProcessTree(serverProcess);
+  serverProcess = null;
+}
+
+// Packaged GUI apps have no visible console — mirror child output to a log file.
+let logStream = null;
+function getLogStream() {
+  if (!logStream) {
+    try {
+      const dir = app.getPath("userData");
+      fs.mkdirSync(dir, { recursive: true });
+      logStream = fs.createWriteStream(path.join(dir, "desktop.log"), { flags: "a" });
+    } catch {
+      logStream = null;
+    }
+  }
+  return logStream;
+}
+
+function pipeLogs(child, label) {
+  const prefix = `[${label}] `;
+  const write = (data) => {
+    process.stdout.write(prefix + data);
+    getLogStream()?.write(prefix + data);
+  };
+  child.stdout?.on("data", write);
+  child.stderr?.on("data", write);
+}
+
+/* ── desktop OAuth (system-browser Google sign-in + zeusai:// deep link) ── */
+
+// The same .env the local server uses (dev: repo root; packaged: unpacked
+// next to the asar).
+function loadAppEnv() {
+  return isDev
+    ? loadEnvFile(path.join(app.getAppPath(), ".env"))
+    : loadEnvFile(path.join(process.resourcesPath, "app.asar.unpacked", ".output", ".env"));
+}
+
+// Read Supabase env from the same .env the local server uses. Only the
+// public URL + publishable key are needed; the service role key never
+// leaves the server process.
+function getSupabaseEnv() {
+  const env = loadAppEnv();
+  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
+  const key = env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return null;
+  return { url, key };
+}
+
+// PKCE pair, matching the exact shapes supabase-js 2.111 generates:
+// verifier = 56 hex chars, challenge = base64url(SHA-256(verifier)).
+function generatePkcePair() {
+  const verifier = crypto.randomBytes(28).toString("hex");
+  const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+
+// Public site URL (used to open /auth/desktop in the packaged app). Falls
+// back to the local server so the flow never breaks when the env is unset.
+function getSiteUrl() {
+  const env = loadAppEnv();
+  return (env.VITE_SITE_URL || env.SITE_URL || "").replace(/\/+$/, "");
+}
+
+// Opens the dedicated desktop auth page (not the normal web login) with the
+// PKCE code_challenge so the page can echo it into Supabase's Google
+// authorize endpoint. The verifier never leaves this process.
+//  - dev: the developer's app IS the local server, so open its own page
+//    (zero deployment needed);
+//  - packaged: open the public site so the browser's existing Zeus session
+//    can be detected (the "already signed in" confirmation case).
+function buildDesktopAuthPageUrl(challenge) {
+  const params = new URLSearchParams({
+    provider: "google",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+  });
+  const base = isDev
+    ? `http://127.0.0.1:${serverPort}`
+    : getSiteUrl() || `http://127.0.0.1:${serverPort}`;
+  return `${base}/auth/desktop?${params.toString()}`;
+}
+
+// Exchange the one-time authorization code for a session (grant_type=pkce,
+// exactly like supabase-js's `_exchangeCodeForSession`).
+async function exchangeCodeForSession(supabase, code, verifier) {
+  const res = await fetch(`${supabase.url}/auth/v1/token?grant_type=pkce`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabase.key,
+    },
+    body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
+    // Never hang the flow on a stalled network call — fail fast so the
+    // renderer can surface an error instead of waiting forever.
+    signal: AbortSignal.timeout(15_000),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    throw new Error(
+      data.error_description || data.error || `Token exchange failed (${res.status})`,
+    );
+  }
+  return data; // { access_token, refresh_token, expires_in, expires_at, token_type, user, ... }
+}
+
+// Deliver a result (session or error) to the renderer. If the window isn't
+// up yet (deep link launched a cold app), stash it for the renderer to pull.
+function sendAuthResult(payload) {
+  if (payload && payload.access_token) {
+    pendingSession = payload; // cleared when the renderer pulls it
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("zeus-desktop:auth-session", payload);
+  }
+}
+
+// A deep link arrived (second-instance argv, startup argv, or open-url).
+// Validate it strictly: only zeusai://auth/callback with a `code` param
+// (or an `error` from Supabase) and zeusai://auth/cancel are accepted, and
+// only while a PKCE flow is pending in THIS process. Anything else is
+// ignored.
+function handleAuthCallback(rawUrl) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return;
+  }
+  if (url.protocol !== `${APP_PROTOCOL}:`) return;
+  if (url.hostname !== "auth") return;
+  const isCallback = url.pathname === "/callback" || url.pathname === "/callback/";
+  const isCancel = url.pathname === "/cancel" || url.pathname === "/cancel/";
+  if (!isCallback && !isCancel) return;
+
+  const flow = pendingOAuth;
+  if (!flow || Date.now() > flow.expiresAt) return; // no pending flow here — ignore
+  pendingOAuth = null; // single-use
+
+  // User declined the device handoff on /auth/desktop.
+  if (isCancel) {
+    sendAuthResult({ error: "Sign-in was declined." });
+    return;
+  }
+
+  const code = url.searchParams.get("code");
+  const error = url.searchParams.get("error");
+  if (error || !code) {
+    sendAuthResult({ error: error || "Google sign-in was cancelled or failed." });
+    return;
+  }
+
+  const supabase = getSupabaseEnv();
+  if (!supabase) {
+    sendAuthResult({ error: "Supabase is not configured in this desktop build." });
+    return;
+  }
+
+  exchangeCodeForSession(supabase, code, flow.verifier)
+    .then((session) => {
+      logLine("[oauth] session exchanged for", session.user?.email ?? session.user?.id ?? "?");
+      sendAuthResult(session);
+    })
+    .catch((err) => {
+      logLine("[oauth] exchange failed:", err.message);
+      sendAuthResult({ error: err.message });
+    });
+}
+
+function findDeepLinkInArgs(args) {
+  return args.find((arg) => arg.startsWith(`${APP_PROTOCOL}://`));
+}
+
+// Register `zeusai://` so the OS hands us deep links:
+//  - dev: point at the electron binary + app path (no installer involved)
+//  - packaged: the NSIS installer already registered the scheme
+//    (electron-builder `protocols`), but re-asserting at launch is harmless.
+function registerProtocol() {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(APP_PROTOCOL, process.execPath, [
+        path.resolve(process.argv[1]),
+      ]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(APP_PROTOCOL);
+  }
+}
+
+function logLine(...parts) {
+  const line = parts.join(" ");
+  process.stdout.write(line + "\n");
+  getLogStream()?.write(line + "\n");
+}
+
+/* ── server lifecycle ───────────────────────────────────────────── */
+
+function spawnDevServer(port) {
+  const root = app.getAppPath();
+  const viteCli = path.join(root, "node_modules", "vite", "bin", "vite.js");
+  const env = {
+    ...process.env,
+    ...loadEnvFile(path.join(root, ".env")),
+  };
+  // Use the system Node here: Vite dev's internal module-runner RPC times out
+  // when run under the Electron binary (ELECTRON_RUN_AS_NODE). The packaged
+  // production server has no such RPC, so it keeps using ELECTRON_RUN_AS_NODE.
+  const child = spawn("node", [viteCli, "dev", "--port", String(port), "--strictPort"], {
+    cwd: root,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  });
+  pipeLogs(child, "vite");
+  return child;
+}
+
+function spawnProdServer(port) {
+  // `.output` is unpacked next to the asar (asarUnpack) because ELECTRON_RUN_AS_NODE
+  // children are plain Node and cannot read asar archives.
+  const unpacked = path.join(process.resourcesPath, "app.asar.unpacked", ".output");
+  const entry = path.join(unpacked, "server", "index.mjs");
+  const env = {
+    ...process.env,
+    PORT: String(port),
+    HOST: "127.0.0.1", // loopback only — never expose the local server to the LAN
+    ELECTRON_RUN_AS_NODE: "1",
+    ...loadEnvFile(path.join(unpacked, ".env")), // runtime secrets, copied by scripts/copy-env.mjs
+  };
+  const child = spawn(process.execPath, [entry], {
+    cwd: unpacked,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  });
+  pipeLogs(child, "nitro");
+  return child;
+}
+
+async function startServer() {
+  for (let attempt = 1; attempt <= MAX_START_ATTEMPTS; attempt++) {
+    serverPort = await findFreePort(isDev ? DEV_PORT_START : PROD_PORT_START);
+    const child = isDev ? spawnDevServer(serverPort) : spawnProdServer(serverPort);
+    serverProcess = child;
+
+    child.on("error", (err) => {
+      if (serverProcess !== child) return;
+      serverProcess = null;
+      if (!quitting) {
+        dialog.showErrorBox(
+          "Zeus AI failed to start",
+          `Could not launch the local server:\n\n${err.message}`,
+        );
+        app.quit();
+      }
+    });
+
+    child.on("exit", (code) => {
+      if (serverProcess !== child) return;
+      serverProcess = null;
+      if (quitting) return;
+      // A crash while the window is not yet up (e.g. the port got grabbed between
+      // probe and bind) is silently retried by the loop; the last attempt dialogs.
+      if (!mainWindow && attempt < MAX_START_ATTEMPTS) return;
+      dialog.showErrorBox(
+        "Zeus AI server stopped",
+        `The local server exited unexpectedly (code ${code}). The app will close.`,
+      );
+      app.quit();
+    });
+
+    const ready = await waitForServer(serverPort, READY_TIMEOUT_MS);
+    if (ready) {
+      createWindow();
+      return;
+    }
+
+    if (serverProcess === child) {
+      // Server is alive but never became ready.
+      if (attempt < MAX_START_ATTEMPTS) {
+        stopServer();
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        continue;
+      }
+      stopServer();
+      dialog.showErrorBox(
+        "Zeus AI failed to start",
+        "The local server did not become ready in time. Check the console output for details.",
+      );
+      app.quit();
+      return;
+    }
+
+    // Server died during startup. The exit handler already decided whether to
+    // retry silently or show the dialog on the last attempt; follow its lead.
+    if (attempt < MAX_START_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      continue;
+    }
+    return;
+  }
+}
+
+/* ── window ─────────────────────────────────────────────────────── */
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1600,
+    height: 900,
+    minWidth: 1100,
+    minHeight: 700,
+    title: "Zeus AI",
+    autoHideMenuBar: true,
+    backgroundColor: "#14102a",
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true, // default; the CJS preload only exposes static values
+    },
+  });
+
+  // If a session finished exchanging before the window was up, deliver it as
+  // soon as the page is ready. Do NOT clear pendingSession here: the push may
+  // beat the renderer's subscription, so the pull (get-session, which clears)
+  // remains the authoritative handoff.
+  mainWindow.webContents.on("did-finish-load", () => {
+    if (pendingSession) {
+      mainWindow?.webContents.send("zeus-desktop:auth-session", pendingSession);
+    }
+  });
+
+  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+  // Launch straight into the app (not the marketing page): authenticated
+  // users reopen into their workspace, and the _authenticated route guard
+  // sends unauthenticated users to /auth (where Continue with Google starts
+  // the system-browser flow).
+  mainWindow.loadURL(`http://127.0.0.1:${serverPort}/chat`);
+}
+
+// IPC validation: only accept calls from our own window on the local server
+// origin (same hostname + port the app is served from).
+function isTrustedSender(event) {
+  if (!mainWindow || event.sender !== mainWindow.webContents) return false;
+  try {
+    const frameUrl = new URL(event.senderFrame?.url ?? "");
+    return (
+      (frameUrl.protocol === "http:" || frameUrl.protocol === "https:") &&
+      (frameUrl.hostname === "127.0.0.1" || frameUrl.hostname === "localhost") &&
+      serverPort != null &&
+      Number(frameUrl.port) === serverPort
+    );
+  } catch {
+    return false;
+  }
+}
+
+/* ── app lifecycle ──────────────────────────────────────────────── */
+
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, commandLine) => {
+    const url = findDeepLinkInArgs(commandLine);
+    if (url) handleAuthCallback(url);
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  // macOS delivers deep links via open-url instead of argv.
+  app.on("open-url", (event, url) => {
+    event.preventDefault();
+    handleAuthCallback(url);
+  });
+
+  // Keep the shell on our own origin: same-origin popups open as windows,
+  // anything else (OAuth, docs, payments) opens in the system browser.
+  app.on("web-contents-created", (_event, contents) => {
+    const isAppUrl = (url) => {
+      try {
+        const parsed = new URL(url);
+        return (
+          (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+          (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") &&
+          Number(parsed.port) === serverPort
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    contents.setWindowOpenHandler(({ url }) => {
+      if (isAppUrl(url)) return { action: "allow" };
+      if (/^https?:/i.test(url)) shell.openExternal(url);
+      return { action: "deny" };
+    });
+
+    contents.on("will-navigate", (event, url) => {
+      if (!isAppUrl(url)) {
+        event.preventDefault();
+        if (/^https?:/i.test(url)) shell.openExternal(url);
+      }
+    });
+  });
+
+  app.whenReady().then(async () => {
+    app.setAppUserModelId(APP_ID);
+    registerProtocol();
+
+    // Desktop OAuth IPC — invoked from the renderer via the preload bridge.
+    // The system browser does the Google dance; this process never renders it.
+    ipcMain.handle("zeus-desktop:oauth:start-google", async (event) => {
+      if (!isTrustedSender(event)) return { error: "Unauthorized caller." };
+      if (pendingOAuth) return { error: "A sign-in is already in progress." };
+      // Fail fast if the build has no Supabase env — the page and the code
+      // exchange need it, so there's no point opening the browser.
+      if (!getSupabaseEnv()) {
+        return { error: "Supabase is not configured in this desktop build." };
+      }
+      const { verifier, challenge } = generatePkcePair();
+      pendingOAuth = { verifier, expiresAt: Date.now() + OAUTH_TTL_MS };
+      const url = buildDesktopAuthPageUrl(challenge);
+      try {
+        await shell.openExternal(url);
+      } catch (err) {
+        pendingOAuth = null;
+        return { error: `Could not open your browser: ${err.message}` };
+      }
+      return { ok: true };
+    });
+
+    // The renderer pulls a session that finished exchanging before its
+    // window existed (cold-start deep link). One-shot: cleared on read.
+    ipcMain.handle("zeus-desktop:oauth:get-session", (event) => {
+      if (!isTrustedSender(event)) return null;
+      const session = pendingSession;
+      pendingSession = null;
+      return session;
+    });
+
+    // The renderer signals a sign-out so a stashed session can't be
+    // re-applied later (e.g. after signing out and revisiting /auth).
+    ipcMain.handle("zeus-desktop:oauth:clear-session", (event) => {
+      if (!isTrustedSender(event)) return;
+      pendingSession = null;
+    });
+
+    // A deep link may have launched this instance while it was closed.
+    const startupUrl = findDeepLinkInArgs(process.argv);
+    if (startupUrl) handleAuthCallback(startupUrl);
+
+    try {
+      await startServer();
+    } catch (err) {
+      dialog.showErrorBox("Zeus AI failed to start", err.message);
+      app.quit();
+    }
+  });
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0 && serverPort && serverProcess) createWindow();
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
+
+  app.on("before-quit", () => {
+    quitting = true;
+    stopServer();
+  });
+
+  // Last-resort cleanup in case quit happens before before-quit.
+  process.on("exit", () => {
+    if (serverProcess) {
+      try {
+        serverProcess.kill();
+      } catch {}
+    }
+  });
+}

@@ -16,6 +16,9 @@ build/
 # Vite / TanStack Start
 .tanstack/
 
+# Electron desktop build output
+release/
+
 # Logs
 npm-debug.log*
 pnpm-debug.log*
@@ -33,3 +36,5 @@ Thumbs.db
 # Supabase local dev
 supabase/.branches
 supabase/.temp
+
+.freebuff/

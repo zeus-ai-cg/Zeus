@@ -2,13 +2,15 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getInitialSession } from "@/lib/auth-session";
+import { getDesktopAuthBridge, isSessionResult } from "@/lib/desktop-auth";
+import { mapAuthError } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Code2, Loader2 } from "lucide-react";
+import { Code2, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/auth")({
+export const Route = createFileRoute("/auth/")({
   head: () => ({
     meta: [
       { title: "Sign in — Zeus AI" },
@@ -21,54 +23,50 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-// Maps raw Supabase auth error messages to clear, specific, user-facing
-// copy. Falls back to the real Supabase message (never a generic
-// "Something went wrong") if we don't recognize it, so nothing is hidden.
-function mapAuthError(message: string): string {
-  const m = message.toLowerCase();
-
-  if (m.includes("invalid login credentials")) {
-    // Supabase deliberately returns this same message whether the email
-    // doesn't exist or the password is wrong, so it can't be used to probe
-    // which accounts exist. We surface it as a single, accurate message
-    // rather than guessing (and, critically, never fall back to signup).
-    return "Incorrect email or password.";
-  }
-  if (m.includes("unable to validate email address") || m.includes("invalid email")) {
-    return "That email address doesn't look valid.";
-  }
-  if (
-    m.includes("user already registered") ||
-    m.includes("already registered") ||
-    m.includes("already exists")
-  ) {
-    return "An account with this email already exists. Try signing in instead.";
-  }
-  if (m.includes("password should be at least") || m.includes("password is too short")) {
-    return message; // already specific and actionable as-is
-  }
-  if (m.includes("email rate limit") || m.includes("rate limit")) {
-    return "Too many attempts. Please wait a moment and try again.";
-  }
-  if (m.includes("email not confirmed")) {
-    return "Please confirm your email address before signing in.";
-  }
-
-  // Unrecognized error: show Supabase's real message rather than a vague one.
-  return message;
-}
-
 function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Desktop: true while the system browser is open for Google sign-in.
+  const [desktopWaiting, setDesktopWaiting] = useState(false);
 
   useEffect(() => {
     getInitialSession().then((session) => {
       if (session?.user) navigate({ to: "/chat", replace: true });
     });
+  }, [navigate]);
+
+  // Desktop shell: pick up a session that finished exchanging before the
+  // window existed (cold-start deep link) or is pushed back by the main
+  // process after the browser flow completes.
+  useEffect(() => {
+    const desktop = getDesktopAuthBridge();
+    if (!desktop) return;
+
+    const apply = async (result: { access_token?: string; error?: string }) => {
+      if (result?.error) {
+        setDesktopWaiting(false);
+        setLoading(false);
+        toast.error(result.error);
+        return;
+      }
+      if (!isSessionResult(result)) return;
+      const { error } = await supabase.auth.setSession(result);
+      setDesktopWaiting(false);
+      setLoading(false);
+      if (error) {
+        toast.error(error.message ?? "Google sign-in failed");
+        return;
+      }
+      toast.success("Welcome back!");
+      navigate({ to: "/chat", replace: true });
+    };
+
+    desktop.getPendingSession().then((result) => apply(result ?? {}));
+    const unsubscribe = desktop.onSessionReady(apply);
+    return unsubscribe;
   }, [navigate]);
 
   // Sign in only. A failed login NEVER creates an account — it just
@@ -130,6 +128,23 @@ function AuthPage() {
   };
 
   const google = async () => {
+    // Desktop shell: hand off to the system browser via the main process
+    // (PKCE + zeusai:// deep link). The session returns over IPC and the
+    // onSessionReady listener above applies it.
+    const desktop = getDesktopAuthBridge();
+    if (desktop) {
+      setLoading(true);
+      const result = await desktop.startGoogleOAuth();
+      if (result?.error) {
+        setLoading(false);
+        toast.error(result.error);
+        return;
+      }
+      setLoading(false);
+      setDesktopWaiting(true);
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -143,6 +158,31 @@ function AuthPage() {
     }
     // Browser will redirect to Google; supabase-js handles the callback on return.
   };
+
+  // Desktop: if the user returns without completing sign-in (or it failed),
+  // clear the waiting state so they can retry.
+  useEffect(() => {
+    if (!desktopWaiting) return;
+    const onFocus = () => setDesktopWaiting(false);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [desktopWaiting]);
+
+  // Desktop: the main process rejects a deep link once its PKCE verifier
+  // expires (10 min). If the flow never completes by then, stop waiting so
+  // the user isn't stuck on "Waiting for browser…" with no way forward.
+  useEffect(() => {
+    if (!desktopWaiting) return;
+    const timer = window.setTimeout(
+      () => {
+        setDesktopWaiting(false);
+        setLoading(false);
+        toast.error("Sign-in timed out. Please try again.");
+      },
+      10 * 60 * 1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [desktopWaiting]);
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground">
@@ -258,15 +298,27 @@ function AuthPage() {
             <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
           </div>
 
-          <Button onClick={google} disabled={loading} variant="outline" className="w-full">
+          <Button
+            onClick={google}
+            disabled={loading || desktopWaiting}
+            variant="outline"
+            className="w-full"
+          >
             <svg className="size-4 mr-2" viewBox="0 0 24 24">
               <path
                 fill="currentColor"
                 d="M21.35 11.1h-9.17v2.92h5.51c-.25 1.37-1.6 4.02-5.51 4.02-3.31 0-6.01-2.74-6.01-6.12s2.7-6.12 6.01-6.12c1.89 0 3.15.81 3.87 1.5l2.64-2.55C17.13 3.18 14.86 2 12.18 2 6.94 2 2.7 6.24 2.7 11.5S6.94 21 12.18 21c7.04 0 9.46-4.94 9.46-7.46 0-.5-.05-.87-.13-1.44z"
               />
             </svg>
-            Continue with Google
+            {desktopWaiting ? "Waiting for browser…" : "Continue with Google"}
           </Button>
+
+          {desktopWaiting && (
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <ExternalLink className="size-3.5" />
+              Complete sign-in in your browser, then return here.
+            </p>
+          )}
 
           <p className="mt-8 text-xs text-center text-muted-foreground">
             By continuing you agree to learn something new today. 🚀

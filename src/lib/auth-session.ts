@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getDesktopAuthBridge } from "@/lib/desktop-auth";
 
 let initialSessionPromise: Promise<Session | null> | null = null;
 
@@ -60,6 +61,10 @@ export async function signOutAndClearAuth(queryClient?: QueryClient | null) {
     await supabase.auth.signOut();
     clearSupabaseAuthStorage();
   }
+
+  // Desktop: invalidate any stashed OAuth session in the main process so it
+  // can't be silently re-applied on a later visit to /auth.
+  getDesktopAuthBridge()?.clearPendingSession();
 }
 
 export function useAuthSession() {
