@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AppWindow,
   Blocks,
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { getMe } from "@/lib/profile.functions";
+import { isDesktopShell } from "@/lib/desktop-auth";
 import { normalizePlan, isProOrAbove, PLAN_LABELS } from "@/lib/plans";
 import { SITE_URL } from "@/lib/site";
 import { toast } from "sonner";
@@ -52,6 +53,14 @@ function DownloadPage() {
   const releaseFn = useServerFn(getReleaseInfo);
   const meFn = useServerFn(getMe);
 
+  // Inside the desktop shell the download page is pointless — the user is
+  // ALREADY on the desktop app. Swap the whole page for a friendly notice.
+  // The bridge only exists after hydration, so default false (SSR-safe).
+  const [onDesktop, setOnDesktop] = useState(false);
+  useEffect(() => {
+    if (isDesktopShell()) setOnDesktop(true);
+  }, []);
+
   const { data: release } = useQuery({
     queryKey: ["release-info"],
     queryFn: () => releaseFn(),
@@ -69,6 +78,31 @@ function DownloadPage() {
       }
     },
   });
+
+  if (onDesktop) {
+    return (
+      <MarketingLayout>
+        <section className="max-w-2xl mx-auto px-6 py-24 text-center">
+          <div className="rounded-2xl border border-border bg-card/60 p-10">
+            <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <AppWindow className="size-7" />
+            </div>
+            <h1 className="text-2xl font-bold">You're already using the Zeus AI Desktop app</h1>
+            <p className="mt-3 text-muted-foreground">
+              Downloads live here on the web — but you're inside the desktop app right now, and it
+              keeps itself up to date automatically. Nothing to install.
+            </p>
+            <a
+              href="/chat"
+              className="mt-6 inline-flex items-center justify-center rounded-md bg-gradient-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:opacity-90 active:scale-[0.98]"
+            >
+              Open your workspace
+            </a>
+          </div>
+        </section>
+      </MarketingLayout>
+    );
+  }
 
   return (
     <MarketingLayout>
