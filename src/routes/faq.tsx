@@ -27,7 +27,7 @@ export const Route = createFileRoute("/faq")({
 const FAQS = [
   {
     q: "How does Zeus AI work?",
-    a: "Zeus AI is an AI coding tutor powered by leading language models. You ask coding questions — about syntax, debugging, projects, algorithms, system design — and it explains, teaches, and helps you build. It adapts to your level (beginner, intermediate, advanced) and remembers context within a conversation.",
+    a: "Zeus AI is an AI coding tutor built to help developers. You ask coding questions — about syntax, debugging, projects, algorithms, system design — and it explains, teaches, and helps you build. It adapts to your level (beginner, intermediate, advanced) and remembers context within a conversation.",
   },
   {
     q: "How many free questions do I get?",

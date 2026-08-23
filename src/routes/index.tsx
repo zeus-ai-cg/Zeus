@@ -130,7 +130,7 @@ function Landing() {
         <div className="max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-12 items-center relative">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs text-muted-foreground mb-6">
-              <Sparkles className="size-3 text-accent" /> Powered by Google Gemini
+              <Sparkles className="size-3 text-accent" /> Built by an indie developer
             </div>
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-[1.05]">
               Your <span className="text-gradient">AI Software Engineer</span>, available 24/7.
