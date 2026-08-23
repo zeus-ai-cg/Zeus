@@ -44,7 +44,7 @@ async function readFilesFromInput(fileList: FileList): Promise<UploadedFile[]> {
       continue;
     if (f.size > 300_000) continue;
     const text = await f.text();
-    const relativePath = "webkitRelativePath" in f ? f.webkitRelativePath : f.name;
+    const relativePath = f.webkitRelativePath || f.name;
     out.push({ name: relativePath || f.name, content: text });
   }
   return out;

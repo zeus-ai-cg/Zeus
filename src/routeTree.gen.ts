@@ -15,6 +15,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as DownloadRouteImport } from './routes/download'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -42,7 +43,13 @@ import { Route as BillingSuccessRouteImport } from './routes/billing.success'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated/chat.index'
 import { Route as AuthenticatedChatThreadIdRouteImport } from './routes/_authenticated/chat.$threadId'
 import { Route as ApiContextTokenRouteImport } from './routes/api/context.$token'
+import { Route as ApiDesktopLatestRouteImport } from './routes/api/desktop/latest'
+import { Route as ApiDownloadDesktopRouteImport } from './routes/api/download/desktop'
+import { Route as ApiDownloadVsixRouteImport } from './routes/api/download/vsix'
 import { Route as ApiLemonsqueezyCheckoutRouteImport } from './routes/api/lemonsqueezy/checkout'
+import { Route as ApiVoiceTranscribeRouteImport } from './routes/api/voice/transcribe'
+import { Route as ApiVscodeEntitlementsRouteImport } from './routes/api/vscode/entitlements'
+import { Route as ApiVscodeLatestRouteImport } from './routes/api/vscode/latest'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,6 +78,11 @@ const BlogRoute = BlogRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -210,9 +222,39 @@ const ApiContextTokenRoute = ApiContextTokenRouteImport.update({
   path: '/api/context/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDesktopLatestRoute = ApiDesktopLatestRouteImport.update({
+  id: '/api/desktop/latest',
+  path: '/api/desktop/latest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDownloadDesktopRoute = ApiDownloadDesktopRouteImport.update({
+  id: '/api/download/desktop',
+  path: '/api/download/desktop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDownloadVsixRoute = ApiDownloadVsixRouteImport.update({
+  id: '/api/download/vsix',
+  path: '/api/download/vsix',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLemonsqueezyCheckoutRoute = ApiLemonsqueezyCheckoutRouteImport.update({
   id: '/api/lemonsqueezy/checkout',
   path: '/api/lemonsqueezy/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVoiceTranscribeRoute = ApiVoiceTranscribeRouteImport.update({
+  id: '/api/voice/transcribe',
+  path: '/api/voice/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVscodeEntitlementsRoute = ApiVscodeEntitlementsRouteImport.update({
+  id: '/api/vscode/entitlements',
+  path: '/api/vscode/entitlements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVscodeLatestRoute = ApiVscodeLatestRouteImport.update({
+  id: '/api/vscode/latest',
+  path: '/api/vscode/latest',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -222,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -248,7 +291,13 @@ export interface FileRoutesByFullPath {
   '/auth/': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
+  '/api/desktop/latest': typeof ApiDesktopLatestRoute
+  '/api/download/desktop': typeof ApiDownloadDesktopRoute
+  '/api/download/vsix': typeof ApiDownloadVsixRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
+  '/api/vscode/entitlements': typeof ApiVscodeEntitlementsRoute
+  '/api/vscode/latest': typeof ApiVscodeLatestRoute
   '/chat/': typeof AuthenticatedChatIndexRoute
 }
 export interface FileRoutesByTo {
@@ -256,6 +305,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -282,7 +332,13 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
+  '/api/desktop/latest': typeof ApiDesktopLatestRoute
+  '/api/download/desktop': typeof ApiDownloadDesktopRoute
+  '/api/download/vsix': typeof ApiDownloadVsixRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
+  '/api/vscode/entitlements': typeof ApiVscodeEntitlementsRoute
+  '/api/vscode/latest': typeof ApiVscodeLatestRoute
   '/chat': typeof AuthenticatedChatIndexRoute
 }
 export interface FileRoutesById {
@@ -293,6 +349,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/faq': typeof FaqRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -319,7 +376,13 @@ export interface FileRoutesById {
   '/auth/': typeof AuthIndexRoute
   '/_authenticated/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
+  '/api/desktop/latest': typeof ApiDesktopLatestRoute
+  '/api/download/desktop': typeof ApiDownloadDesktopRoute
+  '/api/download/vsix': typeof ApiDownloadVsixRoute
   '/api/lemonsqueezy/checkout': typeof ApiLemonsqueezyCheckoutRoute
+  '/api/voice/transcribe': typeof ApiVoiceTranscribeRoute
+  '/api/vscode/entitlements': typeof ApiVscodeEntitlementsRoute
+  '/api/vscode/latest': typeof ApiVscodeLatestRoute
   '/_authenticated/chat/': typeof AuthenticatedChatIndexRoute
 }
 export interface FileRouteTypes {
@@ -330,6 +393,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/blog'
     | '/contact'
+    | '/download'
     | '/faq'
     | '/pricing'
     | '/privacy'
@@ -356,7 +420,13 @@ export interface FileRouteTypes {
     | '/auth/'
     | '/chat/$threadId'
     | '/api/context/$token'
+    | '/api/desktop/latest'
+    | '/api/download/desktop'
+    | '/api/download/vsix'
     | '/api/lemonsqueezy/checkout'
+    | '/api/voice/transcribe'
+    | '/api/vscode/entitlements'
+    | '/api/vscode/latest'
     | '/chat/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -364,6 +434,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/blog'
     | '/contact'
+    | '/download'
     | '/faq'
     | '/pricing'
     | '/privacy'
@@ -390,7 +461,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/chat/$threadId'
     | '/api/context/$token'
+    | '/api/desktop/latest'
+    | '/api/download/desktop'
+    | '/api/download/vsix'
     | '/api/lemonsqueezy/checkout'
+    | '/api/voice/transcribe'
+    | '/api/vscode/entitlements'
+    | '/api/vscode/latest'
     | '/chat'
   id:
     | '__root__'
@@ -400,6 +477,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/blog'
     | '/contact'
+    | '/download'
     | '/faq'
     | '/pricing'
     | '/privacy'
@@ -426,7 +504,13 @@ export interface FileRouteTypes {
     | '/auth/'
     | '/_authenticated/chat/$threadId'
     | '/api/context/$token'
+    | '/api/desktop/latest'
+    | '/api/download/desktop'
+    | '/api/download/vsix'
     | '/api/lemonsqueezy/checkout'
+    | '/api/voice/transcribe'
+    | '/api/vscode/entitlements'
+    | '/api/vscode/latest'
     | '/_authenticated/chat/'
   fileRoutesById: FileRoutesById
 }
@@ -437,6 +521,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
+  DownloadRoute: typeof DownloadRoute
   FaqRoute: typeof FaqRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -450,7 +535,13 @@ export interface RootRouteChildren {
   BillingCancelRoute: typeof BillingCancelRoute
   BillingSuccessRoute: typeof BillingSuccessRoute
   ApiContextTokenRoute: typeof ApiContextTokenRoute
+  ApiDesktopLatestRoute: typeof ApiDesktopLatestRoute
+  ApiDownloadDesktopRoute: typeof ApiDownloadDesktopRoute
+  ApiDownloadVsixRoute: typeof ApiDownloadVsixRoute
   ApiLemonsqueezyCheckoutRoute: typeof ApiLemonsqueezyCheckoutRoute
+  ApiVoiceTranscribeRoute: typeof ApiVoiceTranscribeRoute
+  ApiVscodeEntitlementsRoute: typeof ApiVscodeEntitlementsRoute
+  ApiVscodeLatestRoute: typeof ApiVscodeLatestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -495,6 +586,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -686,11 +784,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiContextTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/desktop/latest': {
+      id: '/api/desktop/latest'
+      path: '/api/desktop/latest'
+      fullPath: '/api/desktop/latest'
+      preLoaderRoute: typeof ApiDesktopLatestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/download/desktop': {
+      id: '/api/download/desktop'
+      path: '/api/download/desktop'
+      fullPath: '/api/download/desktop'
+      preLoaderRoute: typeof ApiDownloadDesktopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/download/vsix': {
+      id: '/api/download/vsix'
+      path: '/api/download/vsix'
+      fullPath: '/api/download/vsix'
+      preLoaderRoute: typeof ApiDownloadVsixRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/lemonsqueezy/checkout': {
       id: '/api/lemonsqueezy/checkout'
       path: '/api/lemonsqueezy/checkout'
       fullPath: '/api/lemonsqueezy/checkout'
       preLoaderRoute: typeof ApiLemonsqueezyCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voice/transcribe': {
+      id: '/api/voice/transcribe'
+      path: '/api/voice/transcribe'
+      fullPath: '/api/voice/transcribe'
+      preLoaderRoute: typeof ApiVoiceTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vscode/entitlements': {
+      id: '/api/vscode/entitlements'
+      path: '/api/vscode/entitlements'
+      fullPath: '/api/vscode/entitlements'
+      preLoaderRoute: typeof ApiVscodeEntitlementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vscode/latest': {
+      id: '/api/vscode/latest'
+      path: '/api/vscode/latest'
+      fullPath: '/api/vscode/latest'
+      preLoaderRoute: typeof ApiVscodeLatestRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -750,6 +890,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
+  DownloadRoute: DownloadRoute,
   FaqRoute: FaqRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
@@ -763,7 +904,13 @@ const rootRouteChildren: RootRouteChildren = {
   BillingCancelRoute: BillingCancelRoute,
   BillingSuccessRoute: BillingSuccessRoute,
   ApiContextTokenRoute: ApiContextTokenRoute,
+  ApiDesktopLatestRoute: ApiDesktopLatestRoute,
+  ApiDownloadDesktopRoute: ApiDownloadDesktopRoute,
+  ApiDownloadVsixRoute: ApiDownloadVsixRoute,
   ApiLemonsqueezyCheckoutRoute: ApiLemonsqueezyCheckoutRoute,
+  ApiVoiceTranscribeRoute: ApiVoiceTranscribeRoute,
+  ApiVscodeEntitlementsRoute: ApiVscodeEntitlementsRoute,
+  ApiVscodeLatestRoute: ApiVscodeLatestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

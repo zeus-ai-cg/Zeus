@@ -115,8 +115,9 @@ export const Route = createFileRoute("/api/engineer")({
               .rpc("get_current_usage", { p_user_id: userId })
               .maybeSingle();
             if (usageRow) {
-              questionsUsed = Number(usageRow.questions_used ?? questionsUsed);
-              proRequestsUsed = Number(usageRow.pro_requests_used ?? proRequestsUsed);
+              const usage = usageRow as Record<string, number | string | null>;
+              questionsUsed = Number(usage.questions_used ?? questionsUsed);
+              proRequestsUsed = Number(usage.pro_requests_used ?? proRequestsUsed);
             }
           }
 

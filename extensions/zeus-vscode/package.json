@@ -1,0 +1,142 @@
+{
+  "name": "zeus-ai",
+  "displayName": "Zeus AI",
+  "description": "Zeus AI — your AI coding companion in VS Code. Chat, explain, fix, refactor, and generate code with Zeus's centralized AI backend.",
+  "version": "0.4.1",
+  "publisher": "zeusai",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/zeus-ai"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "zeus",
+    "zeus ai",
+    "ai",
+    "coding assistant",
+    "copilot",
+    "chat",
+    "engineer"
+  ],
+  "main": "./dist/extension.js",
+  "icon": "media/icon.png",
+  "activationEvents": [
+    "onView:zeus-ai.sidebar",
+    "onCommand:zeus.open",
+    "onCommand:zeus.signIn",
+    "onCommand:zeus.signOut"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "zeus.open",
+        "title": "Zeus: Open"
+      },
+      {
+        "command": "zeus.signIn",
+        "title": "Zeus: Sign In"
+      },
+      {
+        "command": "zeus.signOut",
+        "title": "Zeus: Sign Out"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "zeus-ai",
+          "title": "Zeus AI",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "zeus-ai": [
+        {
+          "type": "webview",
+          "id": "zeus-ai.sidebar",
+          "name": "Zeus AI"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Zeus AI",
+      "properties": {
+        "zeus.apiBaseUrl": {
+          "type": "string",
+          "default": "https://zeusai.website",
+          "markdownDescription": "Zeus backend API base URL. The extension sends authenticated chat requests to this domain. Must serve the Zeus /api/chat endpoint."
+        },
+        "zeus.supabaseUrl": {
+          "type": "string",
+          "default": "https://ohgvjmrgaperrfhcrgld.supabase.co",
+          "markdownDescription": "Public Supabase project URL used for authentication. Override only for development/testing against a different project."
+        },
+        "zeus.supabaseAnonKey": {
+          "type": "string",
+          "default": "sb_publishable_wwCxSTYWoKfRWzJWVOnLDQ_WJhusIDl",
+          "markdownDescription": "Public Supabase **publishable (anon)** key used for authentication. This is the same public key the Zeus web app ships in its client bundle — it is **not** a secret and must never be replaced with a service-role key."
+        },
+        "zeus.privacy.respectGitignore": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Skip files matched by the workspace `.gitignore` when building project context. Sensitive files (.env, keys, credentials) are ALWAYS excluded regardless of this setting."
+        },
+        "zeus.privacy.extraBlockedPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Additional glob patterns to exclude from all Zeus context (e.g. `internal/**`). Applied on top of the built-in privacy rules, which cannot be relaxed."
+        },
+        "zeus.context.maxFiles": {
+          "type": "number",
+          "default": 300,
+          "minimum": 10,
+          "maximum": 2000,
+          "markdownDescription": "Maximum number of file paths included in a workspace scan manifest."
+        },
+        "zeus.context.maxFileKB": {
+          "type": "number",
+          "default": 64,
+          "minimum": 1,
+          "maximum": 512,
+          "markdownDescription": "Maximum size (KB) of any single file included in context."
+        },
+        "zeus.context.maxTotalKB": {
+          "type": "number",
+          "default": 512,
+          "minimum": 16,
+          "maximum": 4096,
+          "markdownDescription": "Maximum total size (KB) of all context sent in one request."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --max-warnings 0",
+    "build": "node esbuild.js",
+    "test": "node scripts/test-otp.mjs && node scripts/test-chat.mjs && node scripts/test-phase3.mjs && node scripts/test-update-version.mjs",
+    "package": "npm run build && npx @vscode/vsce package",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.9.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.3.0"
+  }
+}

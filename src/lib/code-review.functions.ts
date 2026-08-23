@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateObject } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -32,7 +32,7 @@ const reviewSchema = z.object({
 
 export const reviewProjectModification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ modificationId: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ modificationId: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
 
@@ -56,7 +56,7 @@ export const reviewProjectModification = createServerFn({ method: "POST" })
     const resolution = await resolveActiveModel(supabase, userId);
     if (!resolution.apiKey) {
       const label = getProvider(resolution.provider)?.label ?? resolution.provider;
-      throw new Error(`No API key configured for ${label}. Add one in Settings → AI Models.`);
+      throw new Error(`No API key configured for ${label}. Add one in Settings â†’ AI Models.`);
     }
 
     let model;
@@ -76,7 +76,7 @@ export const reviewProjectModification = createServerFn({ method: "POST" })
       model,
       schema: reviewSchema,
       system:
-        "You are a meticulous senior code reviewer. Review the following changed files for security, performance, readability, maintainability, best practices, and potential bugs. Be specific and only flag genuine issues — don't pad the list with nitpicks to seem thorough.",
+        "You are a meticulous senior code reviewer. Review the following changed files for security, performance, readability, maintainability, best practices, and potential bugs. Be specific and only flag genuine issues â€” don't pad the list with nitpicks to seem thorough.",
       prompt: `Change: ${mod.summary}\nOriginal request: ${mod.instructions}\n\nCHANGED FILES (final content):${parts.join("")}`,
     });
 

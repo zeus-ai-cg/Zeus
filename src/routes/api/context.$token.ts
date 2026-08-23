@@ -31,7 +31,12 @@ export const Route = createFileRoute("/api/context/$token")({
             .maybeSingle();
 
           if (error) throw error;
-          if (!data) {
+          const ctx = data as unknown as {
+            project_name: string;
+            created_at: string;
+            content: string;
+          } | null;
+          if (!ctx) {
             return new Response("Not found. This context link may have been deleted.", {
               status: 404,
               headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -39,12 +44,12 @@ export const Route = createFileRoute("/api/context/$token")({
           }
 
           const body =
-            `# Zeus AI Project Context — ${data.project_name}\n` +
-            `# Generated: ${data.created_at}\n` +
+            `# Zeus AI Project Context — ${ctx.project_name}\n` +
+            `# Generated: ${ctx.created_at}\n` +
             `#\n` +
             `# Paste this whole page into Claude, ChatGPT, or any AI coding assistant\n` +
             `# so it has the same context Zeus AI does for this project.\n\n` +
-            data.content;
+            ctx.content;
 
           return new Response(body, {
             status: 200,

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 const FOOTER_LINKS: { label: string; to: string }[] = [
   { label: "Home", to: "/" },
+  { label: "Download", to: "/download" },
   { label: "Pricing", to: "/pricing" },
   { label: "Contact", to: "/contact" },
   { label: "About Us", to: "/about" },
@@ -39,6 +40,9 @@ export function MarketingHeader() {
               >
                 Dashboard
               </Link>
+              <Link to="/download" className="px-3 py-2 text-muted-foreground hover:text-foreground">
+                Download
+              </Link>
               <Link to="/pricing" className="px-3 py-2 text-muted-foreground hover:text-foreground">
                 Pricing
               </Link>
@@ -48,6 +52,9 @@ export function MarketingHeader() {
             </>
           ) : (
             <>
+              <Link to="/download" className="px-3 py-2 text-muted-foreground hover:text-foreground">
+                Download
+              </Link>
               <Link to="/pricing" className="px-3 py-2 text-muted-foreground hover:text-foreground">
                 Pricing
               </Link>

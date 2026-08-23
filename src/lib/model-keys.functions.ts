@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptSecret, lastFour } from "./crypto.server";
@@ -14,13 +14,13 @@ export const listUserApiKeys = createServerFn({ method: "GET" })
       .select("provider, last_four, created_at, updated_at")
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    // Never return encrypted_key — this is the client-visible shape only.
+    // Never return encrypted_key â€” this is the client-visible shape only.
     return data ?? [];
   });
 
 export const saveUserApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ provider: z.enum(PROVIDER_VALUES), apiKey: z.string().min(8).max(400) }).parse(i),
   )
   .handler(async ({ context, data }) => {
@@ -40,7 +40,7 @@ export const saveUserApiKey = createServerFn({ method: "POST" })
 
 export const deleteUserApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ provider: z.enum(PROVIDER_VALUES) }).parse(i))
+  .validator((i: unknown) => z.object({ provider: z.enum(PROVIDER_VALUES) }).parse(i))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
       .from("user_api_keys")
@@ -53,7 +53,7 @@ export const deleteUserApiKey = createServerFn({ method: "POST" })
 
 export const setActiveModel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ provider: z.enum(PROVIDER_VALUES), modelId: z.string().min(1).max(120) }).parse(i),
   )
   .handler(async ({ context, data }) => {

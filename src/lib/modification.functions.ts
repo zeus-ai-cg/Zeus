@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { generateObject } from "ai";
@@ -82,7 +82,7 @@ function renderTreeText(node: TreeNode, depth = 0, budget = { remaining: 3000 })
   const lines: string[] = [];
   if (node.name !== "/") {
     const line = `${"  ".repeat(depth)}${node.type === "folder" ? "d" : "-"} ${node.name}\n`;
-    if (line.length > budget.remaining) return "…(truncated)\n";
+    if (line.length > budget.remaining) return "â€¦(truncated)\n";
     lines.push(line);
     budget.remaining -= line.length;
   }
@@ -91,7 +91,7 @@ function renderTreeText(node: TreeNode, depth = 0, budget = { remaining: 3000 })
   );
   for (const c of children) {
     if (budget.remaining <= 0) {
-      lines.push("…(truncated)\n");
+      lines.push("â€¦(truncated)\n");
       break;
     }
     lines.push(renderTreeText(c, node.name === "/" ? depth : depth + 1, budget));
@@ -171,7 +171,7 @@ async function selectCandidateFiles(
 
 export const proposeProjectModification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ projectId: z.string().uuid(), instructions: z.string().min(1).max(4000) }).parse(i),
   )
   .handler(async ({ context, data }) => {
@@ -184,11 +184,11 @@ export const proposeProjectModification = createServerFn({ method: "POST" })
       const providerLabel =
         getProvider(modelResolution.provider)?.label ?? modelResolution.provider;
       throw new Error(
-        `No API key configured for ${providerLabel}. Add one in Settings → AI Models, or switch your active model back to Gemini.`,
+        `No API key configured for ${providerLabel}. Add one in Settings â†’ AI Models, or switch your active model back to Gemini.`,
       );
     }
 
-    // Same free/pro question quota as chat and Connectors — modification
+    // Same free/pro question quota as chat and Connectors â€” modification
     // proposals are a model call like any other and must count against it,
     // never a way to bypass usage limits. Skipped for BYOK requests, same
     // as chat.
@@ -330,7 +330,7 @@ export const proposeProjectModification = createServerFn({ method: "POST" })
       .single();
     if (insertErr) throw new Error(insertErr.message);
 
-    // Zeus Credits (Feature 6) — informational only, see credit_ledger migration.
+    // Zeus Credits (Feature 6) â€” informational only, see credit_ledger migration.
     await logCredits(supabase, userId, "feature_generate", FLAT_CREDIT_COSTS.feature_generate, {
       projectId: data.projectId,
     });
@@ -340,7 +340,7 @@ export const proposeProjectModification = createServerFn({ method: "POST" })
 
 export const applyProjectModification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { supabase } = context;
 
@@ -417,7 +417,7 @@ export const applyProjectModification = createServerFn({ method: "POST" })
 
 export const rollbackProjectModification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { supabase } = context;
 
@@ -495,7 +495,7 @@ export const rollbackProjectModification = createServerFn({ method: "POST" })
 
 export const listProjectModifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ projectId: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ projectId: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { data: rows, error } = await context.supabase
       .from("workspace_modifications")
@@ -509,7 +509,7 @@ export const listProjectModifications = createServerFn({ method: "GET" })
 
 export const getProjectModification = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { data: row, error } = await context.supabase
       .from("workspace_modifications")

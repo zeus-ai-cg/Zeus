@@ -16,13 +16,20 @@ export function isLemonSqueezyApiConfigured(): boolean {
 /**
  * Cancels a subscription via Lemon Squeezy's API (sets it to cancel at
  * period end, matching "Pro access stays until the end of the period" in
- * the billing UI). Returns false (never throws) if the API key isn't
- * configured or the call fails — callers treat that as "fall back to a
- * local-only downgrade" rather than blocking the user.
+ * the billing UI).
+ *
+ * H1 fix: returns the paid-through date (`data.attributes.ends_at`) so the
+ * caller can record exactly when access ends WITHOUT downgrading the plan —
+ * the downgrade itself happens only when the subscription_expired webhook
+ * fires. Returns { ok: false } (never throws) if the API key isn't
+ * configured or the call fails; callers must NOT change any plan state in
+ * that case (the user keeps their current tier and can retry).
  */
-export async function cancelLemonSqueezySubscription(subscriptionId: string): Promise<boolean> {
+export async function cancelLemonSqueezySubscription(
+  subscriptionId: string,
+): Promise<{ ok: boolean; endsAt: string | null }> {
   const apiKey = process.env.LEMONSQUEEZY_API_KEY;
-  if (!apiKey) return false;
+  if (!apiKey) return { ok: false, endsAt: null };
   try {
     const res = await fetch(`${API_BASE}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
       method: "DELETE",
@@ -38,11 +45,22 @@ export async function cancelLemonSqueezySubscription(subscriptionId: string): Pr
         res.status,
         await res.text().catch(() => ""),
       );
-      return false;
+      return { ok: false, endsAt: null };
     }
-    return true;
+    let endsAt: string | null = null;
+    try {
+      const body = (await res.json()) as {
+        data?: { attributes?: { ends_at?: string | null } };
+      };
+      const value = body.data?.attributes?.ends_at;
+      endsAt = typeof value === "string" && value ? value : null;
+    } catch {
+      // Response body isn't required for a successful cancel; treat as
+      // unknown paid-through date and fall back to the webhook's ends_at.
+    }
+    return { ok: true, endsAt };
   } catch (error) {
     console.error("[lemonsqueezy] cancel subscription error", error);
-    return false;
+    return { ok: false, endsAt: null };
   }
 }

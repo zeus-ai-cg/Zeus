@@ -1,4 +1,4 @@
-import { createStart, createMiddleware } from "@tanstack/react-start";
+import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
@@ -18,7 +18,14 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// Same-origin protection for server-fn RPCs (TanStack Start recommends
+// this explicitly; /api/* REST routes used by the VS Code extension keep
+// their own Bearer-token auth and are unaffected by this filter).
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
+});
+
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware],
+  requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));

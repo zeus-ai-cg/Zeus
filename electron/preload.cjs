@@ -13,7 +13,8 @@ function subscribe(channel, callback) {
 }
 
 contextBridge.exposeInMainWorld("zeusDesktop", {
-  version: "1.5",
+  // Keep in sync with the root package.json version (manual, see audit L12).
+  version: "1.5.1",
   platform: process.platform,
   isDesktop: true,
 

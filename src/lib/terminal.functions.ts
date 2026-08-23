@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateObject } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -12,7 +12,7 @@ import { getProvider } from "./model-providers";
 // IMPORTANT: this generates a command suggestion only. It never executes
 // anything server-side. Running arbitrary shell commands against arbitrary
 // uploaded user projects in a shared, multi-tenant backend would be a
-// remote-code-execution hole — there's no sandboxing infrastructure in this
+// remote-code-execution hole â€” there's no sandboxing infrastructure in this
 // app to do that safely, so the honest and safe scope for "AI Terminal" here
 // is: explain the exact command, why it's the right one, and what could go
 // wrong, and let the user run it themselves.
@@ -33,7 +33,7 @@ const commandSchema = z.object({
 
 export const generateTerminalCommand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({ projectId: z.string().uuid().optional(), request: z.string().min(1).max(500) })
       .parse(i),
@@ -56,7 +56,7 @@ export const generateTerminalCommand = createServerFn({ method: "POST" })
     const resolution = await resolveActiveModel(supabase, userId);
     if (!resolution.apiKey) {
       const label = getProvider(resolution.provider)?.label ?? resolution.provider;
-      throw new Error(`No API key configured for ${label}. Add one in Settings → AI Models.`);
+      throw new Error(`No API key configured for ${label}. Add one in Settings â†’ AI Models.`);
     }
 
     let model;

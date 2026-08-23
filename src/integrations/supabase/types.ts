@@ -447,6 +447,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      get_current_usage: {
+        Args: { p_user_id: string };
+        Returns: {
+          plan: string;
+          questions_used: number;
+          usage_reset_at: string;
+          pro_requests_used: number;
+          pro_usage_reset_at: string;
+        }[];
+      };
       increment_usage: {
         Args: { p_user_id: string };
         Returns: {

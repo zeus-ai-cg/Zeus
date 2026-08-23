@@ -40,7 +40,10 @@ function getRuntimeEnvValue(...keys: string[]): string | undefined {
 
 function tierCheckoutUrl(tier: CheckoutTier): string | undefined {
   return tier === "ultimate"
-    ? getRuntimeEnvValue("LEMONSQUEEZY_ULTIMATE_CHECKOUT_URL", "VITE_LEMONSQUEEZY_ULTIMATE_CHECKOUT_URL")
+    ? getRuntimeEnvValue(
+        "LEMONSQUEEZY_ULTIMATE_CHECKOUT_URL",
+        "VITE_LEMONSQUEEZY_ULTIMATE_CHECKOUT_URL",
+      )
     : getRuntimeEnvValue("LEMONSQUEEZY_PRO_CHECKOUT_URL", "VITE_LEMONSQUEEZY_PRO_CHECKOUT_URL");
 }
 
@@ -60,9 +63,10 @@ export async function initLemonSqueezy(tier: CheckoutTier = "pro"): Promise<void
         body: JSON.stringify({ tier, preview: true }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string; message?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+      } | null;
 
       if (!response.ok) {
         throw new Error(payload?.message ?? "Lemon Squeezy checkout could not be initialized.");
@@ -81,27 +85,39 @@ export async function initLemonSqueezy(tier: CheckoutTier = "pro"): Promise<void
 
 export async function openCheckout(
   tier: CheckoutTier,
+  // NOTE (H2 fix): opts.userId is accepted for call-site compatibility but
+  // deliberately NOT sent — the checkout route now derives the account to
+  // upgrade exclusively from the verified Supabase session (Authorization
+  // header below). A client-supplied id could otherwise upgrade any account.
   opts: { email?: string; userId?: string } = {},
 ) {
-  try {
-    await initLemonSqueezy(tier);
-  } catch (error) {
-    throw error;
-  }
+  await initLemonSqueezy(tier);
 
-  console.info("[lemonsqueezy] checkout.request", { tier, email: Boolean(opts.email), userId: Boolean(opts.userId) });
+  console.info("[lemonsqueezy] checkout.request", { tier, email: Boolean(opts.email) });
+
+  const { supabase } = await import("@/integrations/supabase/client");
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
 
   const response = await fetch(CHECKOUT_ROUTE, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tier, email: opts.email, userId: opts.userId }),
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ tier, email: opts.email }),
   });
 
-  const payload = (await response.json().catch(() => null)) as
-    | { checkoutUrl?: string; error?: string; message?: string }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    checkoutUrl?: string;
+    error?: string;
+    message?: string;
+  } | null;
 
   if (!response.ok || !payload?.checkoutUrl) {
+    if (payload?.error === "auth_required") {
+      throw new Error("Please sign in before upgrading.");
+    }
     const message = payload?.message ?? payload?.error ?? "Checkout creation failed";
     console.error("[lemonsqueezy] checkout.failed", { tier, message });
     throw new Error(message);

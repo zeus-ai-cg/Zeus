@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ export const listThreads = createServerFn({ method: "GET" })
 
 export const getThread = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }) => {
     const { data: row, error } = await context.supabase
       .from("threads")
@@ -28,7 +28,7 @@ export const getThread = createServerFn({ method: "GET" })
 
 export const setThreadWorkspaceProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({ id: z.string().uuid(), workspaceProjectId: z.string().uuid().nullable() })
       .parse(input),
@@ -44,7 +44,7 @@ export const setThreadWorkspaceProject = createServerFn({ method: "POST" })
 
 export const createThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         title: z.string().min(1).max(120).optional(),
@@ -68,7 +68,7 @@ export const createThread = createServerFn({ method: "POST" })
 
 export const deleteThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase.from("threads").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -77,7 +77,7 @@ export const deleteThread = createServerFn({ method: "POST" })
 
 export const renameThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ id: z.string().uuid(), title: z.string().min(1).max(120) }).parse(input),
   )
   .handler(async ({ context, data }) => {
@@ -91,7 +91,7 @@ export const renameThread = createServerFn({ method: "POST" })
 
 export const getThreadMessages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ threadId: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ threadId: z.string().uuid() }).parse(input))
   .handler(async ({ context, data }) => {
     const { data: rows, error } = await context.supabase
       .from("messages")

@@ -3,7 +3,14 @@
 // resolver in routes/api/chat.ts (to know how to build a client for each).
 
 export type ProviderId =
-  "gemini" | "openai" | "anthropic" | "openrouter" | "groq" | "deepseek" | "mistral";
+  | "oxalpha"
+  | "gemini"
+  | "openai"
+  | "anthropic"
+  | "openrouter"
+  | "groq"
+  | "deepseek"
+  | "mistral";
 
 export type ProviderInfo = {
   id: ProviderId;
@@ -17,6 +24,15 @@ export type ProviderInfo = {
 };
 
 export const PROVIDERS: ProviderInfo[] = [
+  {
+    id: "oxalpha",
+    label: "Ox Alpha",
+    keyPlaceholder: "sk-...",
+    keyHelpUrl: "https://oxalpha.io",
+    models: [{ id: "stealth/ox-alpha", label: "Ox Alpha (1M context)" }],
+    openAiCompatible: { baseURL: "https://openrouter.ai/api/v1" },
+    builtIn: true,
+  },
   {
     id: "gemini",
     label: "Google Gemini",

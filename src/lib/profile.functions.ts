@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import {
@@ -41,7 +41,7 @@ export const getMe = createServerFn({ method: "GET" })
     // profiles.questions_used / pro_requests_used etc. are protected against
     // direct writes from the authenticated role (see
     // supabase/migrations/20260725120000_lock_down_profile_privileges.sql),
-    // so a plain .update() here would silently no-op — this RPC is the only
+    // so a plain .update() here would silently no-op â€” this RPC is the only
     // way a request running under the user's own JWT can apply a reset.
     let questions_used = Number(profile.questions_used ?? 0);
     let usage_reset_at = normalizeTimestamp(profile.usage_reset_at);
@@ -85,16 +85,16 @@ export const getMe = createServerFn({ method: "GET" })
 
 export const completeOnboarding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  // `plan` is accepted here only to know which screen to route to next —
+  // `plan` is accepted here only to know which screen to route to next â€”
   // it is NEVER written to the database. Onboarding used to write
   // `plan: data.plan` straight to profiles, which meant clicking "Upgrade
   // to Pro" on the onboarding screen granted Pro instantly with no payment
-  // (profiles.plan is also now DB-protected against this either way — see
-  // supabase/migrations/20260725120000_lock_down_profile_privileges.sql —
+  // (profiles.plan is also now DB-protected against this either way â€” see
+  // supabase/migrations/20260725120000_lock_down_profile_privileges.sql â€”
   // but the request should never have reached the table in the first
   // place). Real Pro activation only happens via the signature-verified
   // Lemon Squeezy webhook at src/routes/api/webhooks.ts.
-  .inputValidator((i: unknown) => z.object({ plan: z.enum(["free", "pro"]) }).parse(i))
+  .validator((i: unknown) => z.object({ plan: z.enum(["free", "pro"]) }).parse(i))
   .handler(async ({ context }) => {
     await context.supabase
       .from("profiles")
@@ -106,10 +106,10 @@ export const completeOnboarding = createServerFn({ method: "POST" })
 export const setPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   // Self-service downgrade only. Upgrading to "pro"/"ultimate" must go
-  // through real payment — see the comment on completeOnboarding above and
+  // through real payment â€” see the comment on completeOnboarding above and
   // src/routes/api/webhooks.ts. Prefer cancelSubscription (below) from the
-  // UI where possible — it also cancels on Lemon Squeezy's side.
-  .inputValidator((i: unknown) => z.object({ plan: z.literal("free") }).parse(i))
+  // UI where possible â€” it also cancels on Lemon Squeezy's side.
+  .validator((i: unknown) => z.object({ plan: z.literal("free") }).parse(i))
   .handler(async ({ context, data }) => {
     await context.supabase.from("profiles").update({ plan: data.plan }).eq("id", context.userId);
     return { ok: true };
@@ -117,6 +117,12 @@ export const setPlan = createServerFn({ method: "POST" })
 
 export const cancelSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  // H1 fix: cancelling stops the NEXT charge but must NOT end paid access
+  // immediately. The plan stays untouched here; the only local change is
+  // marking the subscription non-renewing and recording the paid-through
+  // date so Billing can show exactly when access ends. The actual downgrade
+  // happens when Lemon Squeezy fires subscription_expired at the end of the
+  // paid period (src/lib/lemonsqueezy-webhook.server.ts).
   .handler(async ({ context }) => {
     const { data: profile } = await context.supabase
       .from("profiles")
@@ -124,24 +130,48 @@ export const cancelSubscription = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
 
-    let cancelledRemotely = false;
     const subscriptionId = (profile as { lemonsqueezy_subscription_id?: string | null } | null)
       ?.lemonsqueezy_subscription_id;
-    if (subscriptionId) {
-      const { cancelLemonSqueezySubscription } = await import("./lemonsqueezy.server");
-      cancelledRemotely = await cancelLemonSqueezySubscription(subscriptionId);
+
+    if (!subscriptionId) {
+      // No subscription to cancel remotely (already free, or the webhook
+      // hasn't linked one yet). Keep whatever state exists — a free user
+      // clicking "Cancel" should simply stay free.
+      return { ok: true, cancelledRemotely: false, endsAt: null as string | null };
     }
 
-    // Downgrade locally either way — subscription_cancelled from Lemon
-    // Squeezy will confirm this independently, but the user shouldn't have
-    // to wait on webhook delivery to see "Cancelled" reflected in the app.
-    await context.supabase.from("profiles").update({ plan: "free" }).eq("id", context.userId);
-    return { ok: true, cancelledRemotely };
+    const { cancelLemonSqueezySubscription } = await import("./lemonsqueezy.server");
+    const result = await cancelLemonSqueezySubscription(subscriptionId);
+
+    if (!result.ok) {
+      // Remote cancellation failed (missing API key or transient API error).
+      // Do NOT touch any profile state: silently downgrading while Lemon
+      // Squeezy keeps charging would be the worst outcome. The UI tells the
+      // user to retry; the subscription_cancelled webhook remains the source
+      // of truth if they succeed elsewhere.
+      return { ok: false, cancelledRemotely: false, endsAt: null as string | null };
+    }
+
+    // Mark non-renewing WITHOUT downgrading. These two columns are frozen
+    // for the authenticated role by protect_privileged_profile_columns, so
+    // the write goes through the service-role client.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        lemonsqueezy_renewal_status: "cancelled",
+        ...(result.endsAt ? { lemonsqueezy_next_renewal_at: result.endsAt } : {}),
+      } as never)
+      .eq("id", context.userId)
+      .eq("lemonsqueezy_subscription_id", subscriptionId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true, cancelledRemotely: true, endsAt: result.endsAt };
   });
 
 export const setLearningMode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ mode: z.enum(MODE_VALUES) }).parse(i))
+  .validator((i: unknown) => z.object({ mode: z.enum(MODE_VALUES) }).parse(i))
   .handler(async ({ context, data }) => {
     const { data: profile } = await context.supabase
       .from("profiles")
@@ -160,7 +190,7 @@ export const setLearningMode = createServerFn({ method: "POST" })
 
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         display_name: z.string().min(1).max(80).optional(),
@@ -184,7 +214,7 @@ export const updateProfile = createServerFn({ method: "POST" })
 
 export const setCodingPreferences = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         codingStyle: z.enum(["idiomatic", "concise", "verbose", "functional"]).optional(),
@@ -253,7 +283,7 @@ export const listSnippets = createServerFn({ method: "GET" })
 
 export const createSnippet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         title: z.string().min(1).max(120),
@@ -274,7 +304,7 @@ export const createSnippet = createServerFn({ method: "POST" })
 
 export const deleteSnippet = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await context.supabase.from("saved_snippets").delete().eq("id", data.id);
     return { ok: true };

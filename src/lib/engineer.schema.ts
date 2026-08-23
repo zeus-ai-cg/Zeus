@@ -148,24 +148,58 @@ export function computeEngineerProgress(o: PartialEngineerProject | undefined): 
   };
 }
 
-// --- Build-intent detection -------------------------------------------------
-// Deliberately conservative: only phrases that read as "build me a whole
-// project" should switch the user into Engineer Mode. Ordinary chat like
-// "make this function faster" or "create a helper for X" must NOT trigger
-// it — see ENGINEER_INTENT_NEGATIVE below.
+// --- Build-intent detection (Claude-style, deliberately conservative) -------
+// Engineer Mode should open ONLY when the message reads as "build me an
+// entire project from scratch" — e.g. "Act as a senior full-stack engineer,
+// create a SaaS dashboard". Ordinary coding chat ("create a helper function",
+// "how do I create a component?", "add login to my app") must stay in normal
+// chat mode, where Zeus answers conversationally instead of scaffolding a
+// whole project.
 
-const ENGINEER_INTENT_VERBS = /^(build|create|develop|clone|generate)\b/i;
-const MAKE_VERB = /^make\b/i;
-const APP_NOUNS =
-  /\b(app|application|website|web ?site|clone|saas|platform|dashboard|crm|discord bot|bot|api|backend|landing page|portfolio|blog|e-?commerce|store|game|mobile app|chrome extension|extension|plugin|admin panel|mvp)\b/i;
+/** Any verb that expresses producing something. */
+const BUILD_VERB =
+  /\b(build|create|make|develop|design|generate|clone|code|program)\b/i;
+
+/** Nouns that imply a WHOLE product/project, not a snippet inside one. */
+const PROJECT_NOUNS =
+  /\b(app|application|web ?app|website|web ?site|saas|platform|dashboard|crm|erp|admin panel|mvp|startup product|social network|marketplace|landing page|portfolio website|blog website|e-?commerce site|online store|game|mobile app|android app|ios app|discord bot|telegram bot|slack bot|twitter bot|chrome extension|vs ?code extension|browser extension|wordpress plugin|full[ -]?stack (app|project|site)|rest api|graphql api|backend api)\b/i;
+
+/** Phrases that make "build from scratch" explicit even without a noun above. */
+const SCRATCH_SIGNALS =
+  /\b(from scratch|full[ -]?stack|end[ -]to[ -]end|complete (project|app|application|website|product)|whole (project|app|application)|entire (project|app|application)|new (project|product))\b/i;
+
+/** Persona framing like "Act as a senior full-stack engineer ..." + a build ask. */
+const ENGINEER_PERSONA =
+  /\b(act as|you are|acting as|work as|behave as)\b[^.!?\n]{0,60}\b(senior |lead |staff )?(full[ -]?stack |software |web |backend|frontend)?\s?(engineer|developer|architect)/i;
+
+/** Small-scope artifacts — these belong in normal chat, never scaffold a project. */
+const SMALL_SCOPE =
+  /\b(function|method|helper|util(s|ity|ities)?|snippet|regex|query|command|script|component|hook|middleware|route|endpoint|module|class|interface|type|variable|constant|config|schema|migration|seed|test case|unit test|integration test|fixture|mock|css|animation|svg|icon|logo|readme|commit message)\b/i;
+
+/** Questions and explanations — even ones containing build words — stay in chat. */
+const QUESTION_OR_EXPLAIN =
+  /^(how|what|why|when|where|which|who|can you|could you explain|explain|describe|tell me|show me how|teach me|help me understand|i want to know|i need to know|kya|kaise|is there|are there|do you know|whats|what's|how's|hows)\b/i;
+
+/** Work on EXISTING code/projects — modifications, not greenfield builds. */
+const MODIFY_EXISTING =
+  /\b(fix|debug|refactor|optimize|improve|update|modify|change|edit|extend|enhance|migrate|convert|port|rewrite|clean ?up|add(ed|ing)? (a |an |the )?)?\b(this|my|the|our|existing|current) (project|repo|repository|codebase|code|app|application|website|file|folder)\b|\b(add|integrate|connect|implement|attach)\b.{0,40}\b(to|in|into|with)\b.{0,20}\b(my|the|this|existing|current)\b/i;
+
 const TOO_SHORT_OR_META =
-  /^(build|create|make|develop|generate|clone)\s*(it|this|that)?\s*[.?!]*$/i;
+  /^(build|create|make|develop|generate|clone)\s*(it|this|that|one|me)?\s*(a |an |the )?(it|this|that)?\s*[.?!]*$/i;
 
 export function detectEngineerIntent(raw: string): boolean {
   const text = raw.trim();
   if (text.length < 8 || text.length > 2000) return false;
   if (TOO_SHORT_OR_META.test(text)) return false;
-  if (ENGINEER_INTENT_VERBS.test(text)) return true;
-  if (MAKE_VERB.test(text) && APP_NOUNS.test(text)) return true;
-  return false;
+  if (!BUILD_VERB.test(text)) return false;
+  if (QUESTION_OR_EXPLAIN.test(text)) return false;
+  if (SMALL_SCOPE.test(text)) return false;
+  if (MODIFY_EXISTING.test(text)) return false;
+
+  // Explicit greenfield signals win immediately.
+  if (SCRATCH_SIGNALS.test(text)) return true;
+  if (ENGINEER_PERSONA.test(text)) return true;
+
+  // Otherwise require BOTH a build verb AND a project-scale noun.
+  return PROJECT_NOUNS.test(text);
 }

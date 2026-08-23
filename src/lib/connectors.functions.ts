@@ -1,8 +1,12 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolveActiveModel } from "./model-resolution.server";
+import { getProvider } from "./model-providers";
 import { FREE_QUESTION_LIMIT, FREE_RESET_HOURS } from "./achievements";
 import { isProOrAbove } from "./plans";
 
@@ -19,7 +23,7 @@ function buildProjectBundle(files: { name: string; content: string }[]): string 
   const parts: string[] = [];
   for (const file of files.slice(0, MAX_FILES)) {
     if (remaining <= 0) {
-      parts.push(`\n\n[...truncated — project too large to include every file...]`);
+      parts.push(`\n\n[...truncated â€” project too large to include every file...]`);
       break;
     }
     const chunk = `\n\n// ===== ${file.name} =====\n${file.content}`.slice(0, remaining);
@@ -30,7 +34,7 @@ function buildProjectBundle(files: { name: string; content: string }[]): string 
 }
 
 function generateToken(): string {
-  // Base64url random token — unguessable, URL-safe, no external deps.
+  // Base64url random token â€” unguessable, URL-safe, no external deps.
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return btoa(String.fromCharCode(...bytes))
@@ -46,7 +50,7 @@ function generateToken(): string {
  */
 export const createProjectContext = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         projectName: z.string().min(1).max(120).default("My Project"),
@@ -82,7 +86,7 @@ export const listProjectContexts = createServerFn({ method: "GET" })
 
 export const deleteProjectContext = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase.from("project_contexts").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -91,7 +95,7 @@ export const deleteProjectContext = createServerFn({ method: "POST" })
 
 const ZEUS_EDIT_SYSTEM_PROMPT = `You are Zeus AI, an intelligent coding assistant built into the Zeus AI platform.
 
-You are reviewing an uploaded project and a change request from the user. Respond as Zeus AI: direct, practical, and encouraging — like a sharp senior engineer pairing with the user. Do not mention or imitate any other AI assistant, product, or company; do not adopt any other assistant's tone, phrasing, or self-description. You are your own product.
+You are reviewing an uploaded project and a change request from the user. Respond as Zeus AI: direct, practical, and encouraging â€” like a sharp senior engineer pairing with the user. Do not mention or imitate any other AI assistant, product, or company; do not adopt any other assistant's tone, phrasing, or self-description. You are your own product.
 
 For every file that needs to change:
 1. State the file name as a heading.
@@ -108,7 +112,7 @@ If a change is ambiguous, make the most reasonable choice and note the assumptio
  */
 export const editProjectWithZeusAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         files: z.array(fileSchema).min(1).max(MAX_FILES),
@@ -117,10 +121,13 @@ export const editProjectWithZeusAI = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ context, data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
-
     const { supabase, userId } = context;
+
+    const modelResolution = await resolveActiveModel(supabase, userId);
+    if (!modelResolution.apiKey) {
+      const label = getProvider(modelResolution.provider)?.label ?? modelResolution.provider;
+      throw new Error(`No API key configured for ${label}. Add one in Settings → AI Models.`);
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -148,8 +155,19 @@ export const editProjectWithZeusAI = createServerFn({ method: "POST" })
     }
 
     const bundle = buildProjectBundle(data.files);
-    const google = createGoogleGenerativeAI({ apiKey });
-    const model = google("gemini-2.5-flash");
+
+    let model;
+    const providerInfo = getProvider(modelResolution.provider);
+    if (modelResolution.provider === "gemini")
+      model = createGoogleGenerativeAI({ apiKey: modelResolution.apiKey })(modelResolution.modelId);
+    else if (modelResolution.provider === "anthropic")
+      model = createAnthropic({ apiKey: modelResolution.apiKey })(modelResolution.modelId);
+    else if (providerInfo?.openAiCompatible)
+      model = createOpenAI({
+        apiKey: modelResolution.apiKey,
+        baseURL: providerInfo.openAiCompatible.baseURL,
+      })(modelResolution.modelId);
+    else model = createOpenAI({ apiKey: modelResolution.apiKey })(modelResolution.modelId);
 
     const { text } = await generateText({
       model,

@@ -153,11 +153,12 @@ export const Route = createFileRoute("/api/chat")({
               .maybeSingle();
             if (usageErr) throw usageErr;
             if (usageRow) {
-              questions_used = Number(usageRow.questions_used ?? questions_used);
-              usage_reset_at = normalizeTimestamp(usageRow.usage_reset_at ?? usage_reset_at);
-              pro_requests_used = Number(usageRow.pro_requests_used ?? pro_requests_used);
+              const usage = usageRow as Record<string, number | string | null>;
+              questions_used = Number(usage.questions_used ?? questions_used);
+              usage_reset_at = normalizeTimestamp(usage.usage_reset_at ?? usage_reset_at);
+              pro_requests_used = Number(usage.pro_requests_used ?? pro_requests_used);
               pro_usage_reset_at = normalizeTimestamp(
-                usageRow.pro_usage_reset_at ?? pro_usage_reset_at,
+                usage.pro_usage_reset_at ?? pro_usage_reset_at,
               );
             }
           }

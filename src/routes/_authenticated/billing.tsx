@@ -36,9 +36,23 @@ function Billing() {
 
   const cancel = useMutation({
     mutationFn: () => cancelFn(),
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries();
-      toast.success("Subscription cancelled. Pro access stays until the end of the period.");
+      // H1: cancelling keeps paid access until the recorded paid-through
+      // date; the plan itself only drops to Free when Lemon Squeezy fires
+      // subscription_expired.
+      if (result?.ok && result.cancelledRemotely) {
+        const until = result.endsAt
+          ? new Date(result.endsAt).toLocaleDateString()
+          : "the end of the period";
+        toast.success(`Cancellation scheduled. Your plan stays active until ${until}.`);
+      } else if (result?.ok) {
+        toast.success("No active subscription found to cancel.");
+      } else {
+        toast.error(
+          "We couldn't reach our payment provider to cancel. Nothing was changed — please try again in a moment.",
+        );
+      }
     },
     onError: (e: Error) => toast.error(e.message || "Couldn't cancel your subscription."),
   });
@@ -54,13 +68,19 @@ function Billing() {
     ?.lemonsqueezy_renewal_status;
   const nextRenewalAt = (profile as { lemonsqueezy_next_renewal_at?: string | null })
     ?.lemonsqueezy_next_renewal_at;
+  const isCancelled = renewalStatus === "cancelled";
   const statusLabel = isPro
     ? renewalStatus === "on_trial"
       ? "Trial"
-      : renewalStatus === "active" || !renewalStatus
-        ? "Active"
-        : renewalStatus
+      : isCancelled
+        ? "Cancels at period end"
+        : renewalStatus === "active" || !renewalStatus
+          ? "Active"
+          : renewalStatus
     : "—";
+  // H1: once cancelled, next_renewal_at holds the paid-through date (ends_at)
+  // rather than a renewal date — label it accordingly.
+  const renewalLabel = isPro ? (isCancelled ? "Paid through" : "Renews on") : "Renewal";
   const renewal = nextRenewalAt
     ? new Date(nextRenewalAt).toLocaleDateString()
     : isPro
@@ -79,13 +99,9 @@ function Billing() {
             icon={<Sparkles className="size-4" />}
             tone={isPro ? "accent" : "default"}
           />
+          <StatCard label="Status" value={statusLabel} icon={<ShieldCheck className="size-4" />} />
           <StatCard
-            label="Status"
-            value={statusLabel}
-            icon={<ShieldCheck className="size-4" />}
-          />
-          <StatCard
-            label={isPro ? "Renews on" : "Renewal"}
+            label={renewalLabel}
             value={isPro ? renewal : "—"}
             icon={<Calendar className="size-4" />}
           />
@@ -103,7 +119,7 @@ function Billing() {
                     : "You're on the Free plan. Upgrade for unlimited questions, advanced modes, and priority responses."}
               </p>
             </div>
-            {isPro ? (
+            {isPro && !isCancelled ? (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline">Cancel subscription</Button>
@@ -126,6 +142,10 @@ function Billing() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            ) : isCancelled ? (
+              <p className="text-sm text-muted-foreground">
+                Cancellation scheduled — your plan stays active until {renewal}.
+              </p>
             ) : (
               <UpgradeProButton email={account.email} userId={account.id} />
             )}

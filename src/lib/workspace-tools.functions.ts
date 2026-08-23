@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -7,7 +7,7 @@ const MAX_MATCHES_PER_FILE = 4;
 
 export const searchProjectFiles = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ projectId: z.string().uuid(), query: z.string().min(2).max(200) }).parse(i),
   )
   .handler(async ({ context, data }) => {

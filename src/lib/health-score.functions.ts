@@ -1,11 +1,11 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildHealthScore, type ProjectHealthScore } from "./health-score";
 
 export const getProjectHealthScore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ projectId: z.string().uuid(), regenerate: z.boolean().default(false) }).parse(i),
   )
   .handler(async ({ context, data }) => {

@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -17,7 +17,7 @@ const KIND_PROMPTS: Record<string, string> = {
   changelog:
     "Write a single Keep a Changelog-style entry (Added/Changed/Fixed/Removed as applicable) summarizing this diff for a CHANGELOG.md.",
   release_notes:
-    "Write user-facing release notes for this diff — plain language, no implementation detail, focused on what changed for the end user.",
+    "Write user-facing release notes for this diff â€” plain language, no implementation detail, focused on what changed for the end user.",
   explain_diff:
     "Explain this diff in plain language: what changed, why it likely changed, and anything a reviewer should pay close attention to.",
 };
@@ -48,7 +48,7 @@ function buildUnifiedDiffText(
     } else {
       const { ops, truncated } = computeLineDiff(f.before, f.after);
       body = truncated
-        ? "(large file — line diff omitted)"
+        ? "(large file â€” line diff omitted)"
         : ops
             .filter((op) => op.type !== "same")
             .map((op) => `${op.type === "add" ? "+" : "-"}${op.line}`)
@@ -63,7 +63,7 @@ function buildUnifiedDiffText(
 
 export const generateGitArtifact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         modificationId: z.string().uuid(),
@@ -94,7 +94,7 @@ export const generateGitArtifact = createServerFn({ method: "POST" })
     const resolution = await resolveActiveModel(supabase, userId);
     if (!resolution.apiKey) {
       const label = getProvider(resolution.provider)?.label ?? resolution.provider;
-      throw new Error(`No API key configured for ${label}. Add one in Settings → AI Models.`);
+      throw new Error(`No API key configured for ${label}. Add one in Settings â†’ AI Models.`);
     }
 
     let model;
@@ -113,7 +113,7 @@ export const generateGitArtifact = createServerFn({ method: "POST" })
     const { text } = await generateText({
       model,
       system:
-        "You are a precise technical writer producing git/version-control artifacts from a real code diff. Be concise and accurate — never invent changes not present in the diff.",
+        "You are a precise technical writer producing git/version-control artifacts from a real code diff. Be concise and accurate â€” never invent changes not present in the diff.",
       prompt: `Change summary: ${mod.summary}\nOriginal request: ${mod.instructions}\n\nDIFF:\n${diffText}\n\n---\n\n${KIND_PROMPTS[data.kind]}`,
     });
 

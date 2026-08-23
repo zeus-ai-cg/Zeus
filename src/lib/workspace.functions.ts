@@ -1,11 +1,11 @@
-import { createServerFn } from "@tanstack/react-start";
+﻿import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ---------------------------------------------------------------------------
 // Limits for this first cut of the Project Workspace. Zeus AI's product
 // vision (see internal spec) calls for 2GB uploads with incremental,
-// background indexing — that needs a queue/worker and object storage for
+// background indexing â€” that needs a queue/worker and object storage for
 // file bodies instead of Postgres rows. This phase stores indexed files as
 // rows in workspace_project_files, which is fine for the vast majority of
 // real-world repos but is intentionally capped so a single upload can't
@@ -122,7 +122,7 @@ function detectFramework(files: { path: string; content: string }[]): {
 
 export const indexWorkspaceProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z
       .object({
         name: z.string().min(1).max(150).default("Untitled Project"),
@@ -198,7 +198,7 @@ export const listWorkspaceProjects = createServerFn({ method: "GET" })
 
 export const toggleProjectPin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), pinned: z.boolean() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid(), pinned: z.boolean() }).parse(i))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
       .from("workspace_projects")
@@ -211,7 +211,7 @@ export const toggleProjectPin = createServerFn({ method: "POST" })
 
 export const getWorkspaceProject = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { data: project, error } = await context.supabase
       .from("workspace_projects")
@@ -224,7 +224,7 @@ export const getWorkspaceProject = createServerFn({ method: "GET" })
 
 export const getWorkspaceProjectFile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
+  .validator((i: unknown) =>
     z.object({ projectId: z.string().uuid(), path: z.string().min(1) }).parse(i),
   )
   .handler(async ({ context, data }) => {
@@ -240,7 +240,7 @@ export const getWorkspaceProjectFile = createServerFn({ method: "GET" })
 
 export const getWorkspaceProjectFiles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ projectId: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ projectId: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { data: files, error } = await context.supabase
       .from("workspace_project_files")
@@ -253,7 +253,7 @@ export const getWorkspaceProjectFiles = createServerFn({ method: "GET" })
 
 export const deleteWorkspaceProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase.from("workspace_projects").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
