@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Code2, Twitter, Github, Linkedin } from "lucide-react";
+import {
+  AtSign,
+  Code2,
+  Facebook,
+  Github,
+  Instagram,
+  Linkedin,
+  Twitter,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthSession } from "@/lib/auth-session";
 import type { ReactNode } from "react";
@@ -122,14 +130,59 @@ export function MarketingFooter() {
             ⚡ Upload. ⚡ Analyze. ⚡ Ship. Your AI Software Engineering Workspace — available 24/7.
           </p>
           <div className="mt-4 flex gap-3 text-muted-foreground">
-            <a href="https://twitter.com" aria-label="Twitter" className="hover:text-foreground">
+            <a
+              href="https://x.com/CodeMasterAI_"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X (Twitter)"
+              className="hover:text-foreground"
+            >
               <Twitter className="size-4" />
             </a>
-            <a href="https://github.com" aria-label="GitHub" className="hover:text-foreground">
+            <a
+              href="https://github.com/zeus-ai-cg/Zeus"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+              className="hover:text-foreground"
+            >
               <Github className="size-4" />
             </a>
-            <a href="https://linkedin.com" aria-label="LinkedIn" className="hover:text-foreground">
+            <a
+              href="https://www.linkedin.com/in/zeus-ai-799001426/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LinkedIn"
+              className="hover:text-foreground"
+            >
               <Linkedin className="size-4" />
+            </a>
+            <a
+              href="https://www.instagram.com/zeusai.cg/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="hover:text-foreground"
+            >
+              <Instagram className="size-4" />
+            </a>
+            <a
+              href="https://www.facebook.com/profile.php?id=61592043411553"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="hover:text-foreground"
+            >
+              <Facebook className="size-4" />
+            </a>
+            <a
+              href="https://www.threads.com/@zeusai.cg"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Threads"
+              className="hover:text-foreground"
+            >
+              <AtSign className="size-4" />
             </a>
           </div>
         </div>
