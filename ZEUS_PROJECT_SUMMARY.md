@@ -1,7 +1,37 @@
-# ZeusAI - Complete Project Summary (v1.5.0)
+# ZeusAI - Complete Project Summary
 
 > Handoff document for AI assistants. Project path:
 > `D:\Haider_documents\Projects\Saas_Projects\ZeusAI\ZeusAIv1.4-release`
+
+---
+
+## 0. CURRENT STATUS (Aug 2026 — read this first)
+
+**Production is LIVE and healthy at https://zeusai.website**
+
+| Item | State |
+|---|---|
+| Web app | Deployed on Vercel (auto-deploys from `main`). Google login WORKING |
+| Desktop | **v1.5.2** on GitHub Releases (`zeus-ai-cg/Zeus`, tag v1.5.2). Hosted-shell architecture — zero secrets inside installer |
+| VS Code ext | **v0.4.1** in Supabase bucket `zeus-releases` + `/api/vscode/latest` feed working |
+| Voice (mic) | RESTORED from old project: `use-voice.ts`, `voice.ts`, `VoiceControl.tsx`, `VoiceSettingsPanel.tsx`. Desktop uses server STT (`GROQ_API_KEY` on Vercel) |
+| Splash screen | Restored in Electron shell + explicit mic permission handler (media only, trusted origins) |
+| Download page | Hidden inside desktop shell (shows "already using desktop" notice via `isDesktopShell()`) |
+| Chat persona | Human teammate style: occasional emojis (max 1-2), humor, mirrors user language incl. Roman Urdu/Hindi |
+| Identity | Zeus = made by **Haider, teen indie developer** — varied phrasing each time; NEVER mention Claude/GPT/OpenAI/Google |
+| Branding | All third-party AI branding removed from UI ("Powered by Google Gemini" badge gone); Google mention ONLY remains in privacy.tsx (legal transparency — keep) |
+| Socials | Footer has real links: X @CodeMasterAI_, github.com/zeus-ai-cg/Zeus, LinkedIn zeus-ai-799001426, IG zeusai.cg, FB profile 61592043411553, Threads @zeusai.cg |
+| Fake reviews | Removed from homepage; honest "Try it on your own project" band instead |
+
+**Key gotchas for future sessions:**
+- Repo canonical URL is `github.com/zeus-ai-cg/Zeus` (old Haidersiddique942 redirects). Local branch `release/zeus-vscode-0.3.0`; deploy = `git push origin release/zeus-vscode-0.3.0:main` (main checked out in another worktree).
+- Publishable key format is new Supabase `sb_publishable_…` — it IS public-safe.
+- Vercel env vars must be RAW values, NO quotes (quotes broke Google login once).
+- Vercel Hobby plan = serverless functions hard-capped ~60s. Engineer mode (long generations) may still die on free plan despite UI showing higher settings. If engineer times out on big projects → Pro plan needed (300s).
+- Engineer detection regexes are English-verb only (`engineer.schema.ts` ~160-204).
+- Free-plan engineer lock: one project ever, consumed AFTER successful generation with files.
+- Remaining backlog (user approval pending): audit H1-H8 fixes (rate limiter, quota TOCTOU, noopener, auto-updater consumer…), M1-M15 mediums, `tsx` missing from devDependencies (`npm test` broken — use `npx tsx scripts/test-billing.mjs`), `LEMONSQUEEZY_ULTIMATE_VARIANT_ID` still empty in .env/Vercel (Ultimate checkout fails until set).
+- Secrets hygiene: NEVER print secret VALUES in chat; names/prefixes only.
 
 ---
 
