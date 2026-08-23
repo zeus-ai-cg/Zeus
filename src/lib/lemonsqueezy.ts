@@ -97,7 +97,16 @@ export async function openCheckout(
 
   const { supabase } = await import("@/integrations/supabase/client");
   const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
+  let token = sessionData.session?.access_token;
+
+  // Resilience: a stale/expired access token would 401 on the server even
+  // though the user IS signed in. Force one refresh round-trip before giving
+  // up, so an idle tab doesn't block checkout.
+  if (!token) {
+    await supabase.auth.refreshSession();
+    const retry = await supabase.auth.getSession();
+    token = retry.data.session?.access_token;
+  }
 
   const response = await fetch(CHECKOUT_ROUTE, {
     method: "POST",
@@ -105,6 +114,8 @@ export async function openCheckout(
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
+    // A fresh timestamp guards against any cached intermediary response.
+    cache: "no-store",
     body: JSON.stringify({ tier, email: opts.email }),
   });
 
