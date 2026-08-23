@@ -8,7 +8,6 @@ import {
   Rocket,
   Shield,
   Check,
-  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthSession } from "@/lib/auth-session";
@@ -98,27 +97,6 @@ const features = [
     icon: Sparkles,
     title: "BYOK & Git tools",
     desc: "Bring your own model keys, generate commits and PR descriptions, and stay in control.",
-  },
-];
-
-const testimonials = [
-  {
-    name: "Aiden K.",
-    role: "Indie developer",
-    quote:
-      "I upload my project, ask Zeus AI to make the change, and review the diff. It feels like having a senior engineer on call.",
-  },
-  {
-    name: "Priya R.",
-    role: "Software engineer",
-    quote:
-      "The Health Score and AI Review catch things before I ship. It's saved me from more than one bad merge.",
-  },
-  {
-    name: "Marco L.",
-    role: "Founder",
-    quote:
-      "The Feature Generator and Project Chat make it easy to move fast on my SaaS without losing track of the codebase.",
   },
 ];
 
@@ -222,29 +200,23 @@ function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto mb-14">
+      {/* Honest value band — no fabricated social proof */}
+      <section className="max-w-5xl mx-auto px-6 py-20">
+        <div className="rounded-xl border border-border bg-card/60 p-10 text-center">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Loved by developers shipping real projects
+            Try it on your own project
           </h2>
-          <p className="mt-3 text-muted-foreground">Real projects, real changes shipped.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-4">
-          {testimonials.map((t) => (
-            <div key={t.name} className="rounded-xl border border-border bg-card/60 p-6">
-              <div className="flex gap-0.5 mb-3 text-accent">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="size-4 fill-current" />
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">"{t.quote}"</p>
-              <div className="mt-4 text-sm">
-                <div className="font-medium">{t.name}</div>
-                <div className="text-xs text-muted-foreground">{t.role}</div>
-              </div>
-            </div>
-          ))}
+          <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+            We don't run paid reviews or testimonials. Instead of taking our word
+            for it, upload a project and see the diffs, health score, and
+            workspace tools yourself — free to start.
+          </p>
+          <a
+            href="/auth"
+            className="mt-8 inline-flex items-center justify-center rounded-md bg-gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow"
+          >
+            Start free
+          </a>
         </div>
       </section>
 

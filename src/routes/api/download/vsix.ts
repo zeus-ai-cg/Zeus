@@ -59,6 +59,13 @@ export const Route = createFileRoute("/api/download/vsix")({
           console.info("[download.vsix] eligibility", { userId, tier });
           if (!isProOrAbove(tier)) return json({ error: "upgrade_required", plan: tier }, 403);
 
+          // Browser callers ask with Accept: application/json so they can
+          // navigate to the artifact themselves — following the 302 via
+          // fetch hits Supabase Storage CORS and breaks the download.
+          if ((request.headers.get("accept") ?? "").includes("application/json")) {
+            return json({ url }, 200);
+          }
+
           return new Response(null, {
             status: 302,
             headers: { Location: url, "Cache-Control": "no-store" },

@@ -194,8 +194,11 @@ function ExtensionCard({
         setState("idle");
         return;
       }
+      // Ask for JSON so the route hands back the artifact URL instead of a
+      // 302 — following that redirect via fetch trips Supabase Storage CORS
+      // and the old fallback re-hit this endpoint without the token.
       const res = await fetch("/api/download/vsix", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       });
       if (res.status === 403 || res.status === 401) {
         toast.error("The VS Code extension is included with Pro and Ultimate plans.");
@@ -203,21 +206,13 @@ function ExtensionCard({
         return;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = version ? `zeus-ai-${version}.vsix` : "zeus-ai.vsix";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast.success("Extension downloaded — see install steps below.");
+      const payload = (await res.json()) as { url?: string };
+      if (!payload.url) throw new Error("no url");
+      window.location.href = payload.url;
+      toast.success("Extension download started — see install steps below.");
       setState("idle");
     } catch {
-      // Blob reads can fail on strict CORS hosts; fall back to direct nav,
-      // which lets the browser handle the redirect natively.
-      window.location.href = "/api/download/vsix";
+      toast.error("Couldn't start the download. Please try again.");
       setState("idle");
     }
   }
