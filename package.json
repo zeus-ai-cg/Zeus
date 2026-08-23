@@ -1,6 +1,6 @@
 {
   "name": "tanstack_start_ts",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Zeus AI â€” AI-powered web development assistant (TanStack Start + Nitro SSR with an Electron desktop shell).",
   "private": true,
   "sideEffects": false,

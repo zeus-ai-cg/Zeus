@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Zeus AI</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+
+      /* Rounded, dark Zeus panel — the main window uses #14102a, so the
+         handoff feels seamless. */
+      .splash {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 18px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(ellipse 70% 55% at 50% 40%, rgba(124, 58, 237, 0.16), transparent 70%),
+          radial-gradient(ellipse 55% 45% at 68% 60%, rgba(34, 211, 238, 0.07), transparent 70%),
+          linear-gradient(180deg, #1a1433 0%, #14102a 100%);
+        opacity: 1;
+        transition: opacity 0.35s ease;
+      }
+
+      /* Added by the main process right before the splash closes. */
+      html.fade-out .splash {
+        opacity: 0;
+      }
+
+      /* Soft brand glow behind the mark. */
+      .glow {
+        position: absolute;
+        width: 340px;
+        height: 340px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(139, 92, 246, 0.22) 0%,
+          rgba(139, 92, 246, 0.07) 50%,
+          transparent 72%
+        );
+        opacity: 0;
+        animation: glow-in 0.9s ease-out 0.35s forwards;
+        pointer-events: none;
+      }
+
+      @keyframes glow-in {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* The official Zeus mark (white variant, baked for the dark theme).
+         Starts slightly below center and rises while fading in — subtle
+         ease-out, no CSS filters. */
+      .logo {
+        position: relative;
+        z-index: 1;
+        width: 300px;
+        height: 300px;
+        object-fit: contain;
+        opacity: 0;
+        transform: translateY(56px);
+        animation: zeus-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+      }
+
+      @keyframes zeus-rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .logo {
+          animation: none;
+          opacity: 1;
+          transform: none;
+        }
+        .glow {
+          animation: none;
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="splash">
+      <div class="glow"></div>
+      <img class="logo" src="./assets/zeus-logo-white.png" alt="Zeus AI" draggable="false" />
+    </div>
+  </body>
+</html>

@@ -15,7 +15,7 @@
 //
 // In dev the local server child is always killed when the app quits.
 
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import { execFile, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -59,6 +59,12 @@ let pendingOAuth = null; // { verifier, expiresAt } for the in-flight flow
 let pendingSession = null; // exchanged session, awaiting renderer pickup
 
 let mainWindow = null;
+
+// Startup splash: the logo animation runs ~850ms; hold it briefly so the
+// handoff never feels like a flicker (restored from the v1.5 desktop app).
+const SPLASH_MIN_MS = 1000;
+let splashWindow = null;
+let splashShownAt = 0;
 let serverProcess = null;
 let serverPort = null;
 let quitting = false;
@@ -441,7 +447,79 @@ async function startServer() {
 
 /* ── window ─────────────────────────────────────────────────────── */
 
+// A frameless, always-on-top splash shown while the app boots. The logo
+// rises + fades in once (CSS animation) and the window is dismissed by
+// dismissSplash() when the main window is ready.
+function createSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) return;
+  splashShownAt = Date.now();
+  splashWindow = new BrowserWindow({
+    width: 480,
+    height: 480,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.once("ready-to-show", () => splashWindow?.show());
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+}
+
+// Smooth handoff: fade the splash out, then close it.
+async function dismissSplash() {
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+  try {
+    await splashWindow.webContents.executeJavaScript(
+      'document.documentElement.classList.add("fade-out")',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  } catch {
+    // window already gone
+  }
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+}
+
+// Zeus Live Voice needs microphone access in the packaged shell (the hosted
+// chat page calls getUserMedia). Grant media ONLY to trusted origins — the
+// configured site (packaged) or the local dev server — and deny everything
+// else, including every other permission type.
+function configurePermissions() {
+  const siteOrigin = (() => {
+    try {
+      return new URL(getSiteUrl()).origin;
+    } catch {
+      return "";
+    }
+  })();
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    let origin = "";
+    try {
+      origin = new URL(details.requestingUrl).origin;
+    } catch {
+      origin = "";
+    }
+    const trusted =
+      origin === siteOrigin ||
+      origin.startsWith("http://127.0.0.1") ||
+      origin.startsWith("http://localhost");
+    callback(trusted && permission === "media");
+  });
+}
+
 function createWindow() {
+  // Splash + mic permissions: set up once, before the main window loads.
+  createSplashWindow();
+  configurePermissions();
   // Dev-mode window/taskbar icon: the favicon-derived ico produced by
   // `npm run desktop:icons`. In a packaged build the exe's embedded icon
   // already covers this, and build/ isn't shipped inside the asar — hence
@@ -475,9 +553,18 @@ function createWindow() {
     }
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.once("ready-to-show", () => {
+    // Hold the splash until its logo animation has finished, then hand over.
+    const hold = Math.max(0, SPLASH_MIN_MS - (Date.now() - splashShownAt));
+    setTimeout(() => {
+      mainWindow?.show();
+      mainWindow?.focus();
+      void dismissSplash();
+    }, hold);
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy();
   });
   // Launch straight into the app (not the marketing page): authenticated
   // users reopen into their workspace, and the _authenticated route guard

@@ -1,4 +1,6 @@
 import { useChat } from "@ai-sdk/react";
+import { useVoice } from "@/hooks/use-voice";
+import { VoiceControl, VoiceStatusPill } from "@/components/VoiceControl";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -283,6 +285,15 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
     [threadId],
   );
 
+  // Zeus Live Voice — a voice turn's transcript is submitted through the
+  // exact same pipeline as typed input (same thread, same /api/chat stream).
+  // The hook stays "processing" until completeTurn() fires in onFinish.
+  const voice = useVoice({
+    onTranscript: (text) => {
+      void submit(text);
+    },
+  });
+
   const { messages, sendMessage, status, stop, error } = useChat({
     id: threadId,
     messages: initialUI,
@@ -294,12 +305,19 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
       // Re-sync with the authoritative server count so the badge never drifts.
       qc.invalidateQueries({ queryKey: ["me"] });
     },
-    onFinish: () => {
+    onFinish: (result) => {
       // Reconcile with the server's true usage count once the full response has
       // streamed in, and refresh the thread list, since the server renames
       // "New conversation" to the first message's text on the first turn.
       qc.invalidateQueries({ queryKey: ["me"] });
       qc.invalidateQueries({ queryKey: ["threads"] });
+      // Zeus speaks the reply: voice turns always speak, typed turns speak
+      // when auto-speak is on. Nothing here blocks or alters the response.
+      const replyText = (result.message?.parts ?? [])
+        .filter((p) => p.type === "text")
+        .map((p) => (p as { text?: string }).text ?? "")
+        .join("");
+      voice.completeTurn(replyText);
     },
   });
 
@@ -315,6 +333,13 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
   useEffect(() => {
     textareaRef.current?.focus();
   }, [threadId, status]);
+
+  // Safety net: if a stream ends without onFinish (abort/timeout) while a
+  // voice turn is still marked "processing", return the voice UI to idle.
+  useEffect(() => {
+    if (status === "ready" && voice.state === "processing") voice.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, voice.state]);
 
   // Track scroll position for "scroll to bottom" button
   useEffect(() => {
@@ -905,6 +930,8 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
             </span>
           </div>
         )}
+        {/* Zeus Live Voice — listening / thinking / speaking status pill */}
+        <VoiceStatusPill voice={voice} />
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1045,6 +1072,7 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <VoiceControl voice={voice} disabled={!token || limitReached} />
             {!isLoading &&
               detectEngineerIntent(input) &&
               images.length === 0 &&
