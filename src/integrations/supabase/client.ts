@@ -24,6 +24,11 @@ function createSupabaseClient() {
       storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+      // Explicit PKCE: OAuth returns a one-time ?code= that the client
+      // exchanges server-to-server — no tokens ever travel in the URL
+      // fragment. The legacy implicit #access_token flow is fragile on
+      // iOS Safari (privacy timers can drop the session before it lands).
+      flowType: "pkce",
     },
   });
 }
