@@ -38,6 +38,10 @@ export function UpgradeUltimateButton({
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const configured = isLemonSqueezyConfigured("ultimate");
   const alreadyUltimate = !isFetching && isUltimate(profile?.plan);
+  // Flash-of-enabled-state guard — see UpgradeProButton for the full note.
+  // Without this, an Ultimate subscriber could re-purchase during the brief
+  // window before the profile query resolves on a fresh page load.
+  const planUnknown = isFetching && !profile;
   const qc = useQueryClient();
   const pollRef = useRef<{ interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(
     null,
@@ -132,6 +136,18 @@ export function UpgradeUltimateButton({
         description: error instanceof Error ? error.message : "Try again.",
       });
     }
+  }
+
+  if (planUnknown) {
+    return (
+      <Button
+        {...rest}
+        disabled
+        className={`bg-primary/15 text-muted-foreground hover:bg-primary/15 cursor-wait ${className ?? ""}`}
+      >
+        <Rocket className="size-4 mr-2 animate-pulse" /> Checking your plan…
+      </Button>
+    );
   }
 
   if (alreadyUltimate) {

@@ -64,7 +64,25 @@ function buildUnauthorized(hint: string) {
  */
 async function authenticateCheckoutRequest(
   request: Request,
-): Promise<{ ok: true; identity: ReturnType<typeof resolveCheckoutIdentity> } | { ok: false; hint: string }> {
+): Promise<
+  | {
+      ok: true;
+      identity: ReturnType<typeof resolveCheckoutIdentity>;
+      supabase: {
+        from: (
+          table: string,
+        ) => {
+          select: (columns: string) => {
+            eq: (
+              column: string,
+              value: string,
+            ) => { single: () => Promise<{ data: { plan?: string } | null; error: unknown }> };
+          };
+        };
+      };
+    }
+  | { ok: false; hint: string }
+> {
   const token = parseBearerToken(request.headers.get("authorization"));
   if (!token) return { ok: false, hint: "no_token_in_request" };
 
@@ -86,7 +104,18 @@ async function authenticateCheckoutRequest(
   return {
     ok: true,
     identity: resolveCheckoutIdentity(data.claims as { sub?: string; email?: unknown }),
+    supabase,
   };
+}
+
+function buildAlreadySubscribed(plan: string) {
+  return new Response(
+    JSON.stringify({
+      error: "already_subscribed",
+      message: `Your account is already on the ${plan} plan — no need to purchase this again.`,
+    }),
+    { status: 409, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
@@ -106,6 +135,25 @@ export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
           const body = (await request.json().catch(() => null)) as CheckoutRequestBody | null;
           const tier = body?.tier === "ultimate" ? "ultimate" : "pro";
           const preview = Boolean(body?.preview);
+
+          // Double-purchase guard (server-side, authoritative): if the
+          // account already holds a plan that covers the requested tier,
+          // refuse to open another checkout — regardless of what any client
+          // flash-of-enabled-state let the user click.
+          if (identity.userId && !preview) {
+            const { data: prof } = await auth.supabase
+              .from("profiles")
+              .select("plan")
+              .eq("id", identity.userId)
+              .single();
+            const plan = typeof prof?.plan === "string" ? String(prof.plan).toLowerCase() : "";
+            const coversRequested = plan === "ultimate" || (tier === "pro" && plan === "pro");
+            if (coversRequested) {
+              console.info("[lemonsqueezy] checkout.already_subscribed", { tier, plan });
+              return buildAlreadySubscribed(plan);
+            }
+          }
+
           // Email: verified session first; client value is only a prefill
           // fallback when the session carries none. It never affects which
           // account gets upgraded.

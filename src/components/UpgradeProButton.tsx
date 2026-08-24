@@ -35,6 +35,11 @@ export function UpgradeProButton({
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const isPro = !isFetching && isProOrAbove(profile?.plan);
   const ultimate = !isFetching && isUltimate(profile?.plan);
+  // Flash-of-enabled-state guard: until the profile query resolves we cannot
+  // know the caller's real plan. Rendering an active upgrade button during
+  // that window lets an existing Pro/Ultimate subscriber start a DUPLICATE
+  // purchase (this actually happened during a page load race).
+  const planUnknown = isFetching && !profile;
   const qc = useQueryClient();
   const pollRef = useRef<{ interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(
     null,
@@ -137,6 +142,18 @@ export function UpgradeProButton({
         description: error instanceof Error ? error.message : "Try again.",
       });
     }
+  }
+
+  if (planUnknown) {
+    return (
+      <Button
+        {...rest}
+        disabled
+        className={`bg-primary/15 text-muted-foreground hover:bg-primary/15 cursor-wait ${className ?? ""}`}
+      >
+        <Sparkles className="size-4 mr-2 animate-pulse" /> Checking your plan…
+      </Button>
+    );
   }
 
   if (isPro) {
