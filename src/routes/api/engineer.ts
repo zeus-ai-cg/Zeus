@@ -201,24 +201,26 @@ export const Route = createFileRoute("/api/engineer")({
           // Defense in depth: env values pasted WITH wrapping quotes would
           // otherwise be sent to the gateway as literal characters.
           const cleanModelId = (id: string) => id.replace(/^["'\s]+|["'\s]+$/g, "");
+          const cleanApiKey = (key: string | null) =>
+            key ? key.replace(/^["'\s]+|["'\s]+$/g, "") : key;
 
           const providerInfo = getProvider(engineerResolution.provider);
           let model;
           if (engineerResolution.provider === "gemini")
-            model = createGoogleGenerativeAI({ apiKey: engineerResolution.apiKey ?? undefined })(
-              cleanModelId(engineerResolution.modelId),
-            );
+            model = createGoogleGenerativeAI({
+              apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined,
+            })(cleanModelId(engineerResolution.modelId));
           else if (engineerResolution.provider === "anthropic")
-            model = createAnthropic({ apiKey: engineerResolution.apiKey ?? undefined })(
+            model = createAnthropic({ apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined })(
               cleanModelId(engineerResolution.modelId),
             );
           else if (providerInfo?.openAiCompatible)
             model = createOpenAI({
-              apiKey: engineerResolution.apiKey ?? undefined,
+              apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined,
               baseURL: providerInfo.openAiCompatible.baseURL,
             })(cleanModelId(engineerResolution.modelId));
           else
-            model = createOpenAI({ apiKey: engineerResolution.apiKey ?? undefined })(
+            model = createOpenAI({ apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined })(
               cleanModelId(engineerResolution.modelId),
             );
 
