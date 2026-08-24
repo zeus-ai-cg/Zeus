@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { createCheckout, lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
 import { parseBearerToken, resolveCheckoutIdentity } from "@/lib/lemonsqueezy-webhook.server";
 
@@ -68,7 +68,7 @@ async function authenticateCheckoutRequest(
   | {
       ok: true;
       identity: ReturnType<typeof resolveCheckoutIdentity>;
-      supabase: SupabaseClient;
+      supabase: ReturnType<typeof createClient>;
     }
   | { ok: false; hint: string }
 > {
