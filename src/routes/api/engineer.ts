@@ -201,23 +201,26 @@ export const Route = createFileRoute("/api/engineer")({
 
           const candidates: Candidate[] = [];
           if (!modelResolution.isByok) {
+            // Aug 2026: Google retired gemini-2.5-flash for NEW API keys
+            // ("use models/gemini-3.6-flash"). Newer generations must be used
+            // or every fresh platform key gets rejected.
             const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY ?? "") ?? "";
             if (geminiKey) {
               candidates.push({
                 label: "gemini",
-                modelId: "gemini-2.5-flash",
-                model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-2.5-flash"),
+                modelId: "gemini-3.6-flash",
+                model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-3.6-flash"),
               });
             }
             const openRouterKey = cleanApiKey(process.env.QWEN_API_KEY ?? "") ?? "";
             if (openRouterKey) {
               candidates.push({
                 label: "openrouter-gemini",
-                modelId: "google/gemini-2.5-flash",
+                modelId: "google/gemini-3.6-flash",
                 model: buildOpenAiCompatible(
                   openRouterKey,
                   "https://openrouter.ai/api/v1",
-                  "google/gemini-2.5-flash",
+                  "google/gemini-3.6-flash",
                 ),
               });
             }
