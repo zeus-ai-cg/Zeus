@@ -222,6 +222,7 @@ export const Route = createFileRoute("/api/engineer")({
               cleanModelId(engineerResolution.modelId),
             );
 
+          let lastStreamError: string | null = null;
           const result = streamObject({
             model,
             schema: engineerProjectSchema,
@@ -231,7 +232,13 @@ export const Route = createFileRoute("/api/engineer")({
             // client instead of an eternal spinner.
             abortSignal: AbortSignal.timeout(240_000),
             onError: (error) => {
-              console.error("Engineer stream error", error);
+              const err = (error as { error?: { message?: string } })?.error;
+              lastStreamError =
+                err?.message ??
+                (typeof error === "object" && error !== null
+                  ? JSON.stringify(error).slice(0, 500)
+                  : String(error));
+              console.error("[engineer] stream error", lastStreamError);
             },
             onFinish: async ({ object }) => {
               // Zeus Credits (Feature 6) — logged once with the real file
@@ -265,7 +272,35 @@ export const Route = createFileRoute("/api/engineer")({
             },
           });
 
-          return result.toTextStreamResponse();
+          // Manual text-stream passthrough: identical bytes to
+          // toTextStreamResponse() on success, but when the provider errors
+          // we append a visible sentinel so clients surface a failure
+          // instead of spinning forever on an empty 200 stream.
+          const encoder = new TextEncoder();
+          const streamBody = new ReadableStream<Uint8Array>({
+            async start(controller) {
+              try {
+                for await (const delta of result.textStream) {
+                  controller.enqueue(encoder.encode(delta));
+                }
+              } catch {
+                // stream consumer error — already reported via onError
+              }
+              if (lastStreamError) {
+                controller.enqueue(
+                  encoder.encode(`\n[zeus-engineer-error] ${lastStreamError}`),
+                );
+              }
+              controller.close();
+            },
+          });
+          return new Response(streamBody, {
+            headers: {
+              "Content-Type": "text/plain; charset=utf-8",
+              "X-Zeus-Engineer-Provider": engineerResolution.provider,
+              "X-Zeus-Engineer-Model": cleanModelId(engineerResolution.modelId),
+            },
+          });
         } catch (error) {
           console.error("Engineer API error", error);
           const message = error instanceof Error ? error.message : "An unexpected error occurred";
