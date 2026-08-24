@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createCheckout, lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
 import { parseBearerToken, resolveCheckoutIdentity } from "@/lib/lemonsqueezy-webhook.server";
 
@@ -68,18 +68,7 @@ async function authenticateCheckoutRequest(
   | {
       ok: true;
       identity: ReturnType<typeof resolveCheckoutIdentity>;
-      supabase: {
-        from: (
-          table: string,
-        ) => {
-          select: (columns: string) => {
-            eq: (
-              column: string,
-              value: string,
-            ) => { single: () => Promise<{ data: { plan?: string } | null; error: unknown }> };
-          };
-        };
-      };
+      supabase: SupabaseClient;
     }
   | { ok: false; hint: string }
 > {
@@ -141,12 +130,12 @@ export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
           // refuse to open another checkout — regardless of what any client
           // flash-of-enabled-state let the user click.
           if (identity.userId && !preview) {
-            const { data: prof } = await auth.supabase
+            const { data: prof } = (await auth.supabase
               .from("profiles")
               .select("plan")
               .eq("id", identity.userId)
-              .single();
-            const plan = typeof prof?.plan === "string" ? String(prof.plan).toLowerCase() : "";
+              .single()) as unknown as { data: { plan?: string } | null };
+            const plan = typeof prof?.plan === "string" ? prof.plan.toLowerCase() : "";
             const coversRequested = plan === "ultimate" || (tier === "pro" && plan === "pro");
             if (coversRequested) {
               console.info("[lemonsqueezy] checkout.already_subscribed", { tier, plan });
