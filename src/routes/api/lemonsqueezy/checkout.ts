@@ -43,9 +43,15 @@ function buildCheckoutError(message: string) {
   });
 }
 
-function buildUnauthorized() {
+function buildUnauthorized(hint: string) {
   return new Response(
-    JSON.stringify({ error: "auth_required", message: "Sign in before starting checkout." }),
+    JSON.stringify({
+      error: "auth_required",
+      message: "Sign in before starting checkout.",
+      // Diagnostic only — distinguishes "browser sent no token" from
+      // "server rejected the token". Contains no secrets.
+      hint,
+    }),
     { status: 401, headers: { "Content-Type": "application/json" } },
   );
 }
@@ -56,9 +62,11 @@ function buildUnauthorized() {
  * returned userId/email come ONLY from verified claims — the request body
  * can never choose which account gets upgraded.
  */
-async function authenticateCheckoutRequest(request: Request) {
+async function authenticateCheckoutRequest(
+  request: Request,
+): Promise<{ ok: true; identity: ReturnType<typeof resolveCheckoutIdentity> } | { ok: false; hint: string }> {
   const token = parseBearerToken(request.headers.get("authorization"));
-  if (!token) return null;
+  if (!token) return { ok: false, hint: "no_token_in_request" };
 
   const SUPABASE_URL = process.env.SUPABASE_URL!;
   const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY!;
@@ -68,9 +76,17 @@ async function authenticateCheckoutRequest(request: Request) {
   });
 
   const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) return null;
+  if (error || !data?.claims) {
+    console.error("[lemonsqueezy] checkout.claims_rejected", {
+      reason: error?.message ?? "no claims returned",
+    });
+    return { ok: false, hint: "claims_rejected" };
+  }
 
-  return resolveCheckoutIdentity(data.claims as { sub?: string; email?: unknown });
+  return {
+    ok: true,
+    identity: resolveCheckoutIdentity(data.claims as { sub?: string; email?: unknown }),
+  };
 }
 
 export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
@@ -78,10 +94,14 @@ export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const identity = await authenticateCheckoutRequest(request);
-          if (!identity) {
-            return buildUnauthorized();
+          const auth = await authenticateCheckoutRequest(request);
+          if (!auth.ok) {
+            return buildUnauthorized(auth.hint);
           }
+          if (!auth.identity) {
+            return buildUnauthorized("identity_unresolvable");
+          }
+          const identity = auth.identity;
 
           const body = (await request.json().catch(() => null)) as CheckoutRequestBody | null;
           const tier = body?.tier === "ultimate" ? "ultimate" : "pro";

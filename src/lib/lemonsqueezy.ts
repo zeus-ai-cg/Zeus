@@ -123,11 +123,16 @@ export async function openCheckout(
     checkoutUrl?: string;
     error?: string;
     message?: string;
+    hint?: string;
   } | null;
 
   if (!response.ok || !payload?.checkoutUrl) {
     if (payload?.error === "auth_required") {
-      throw new Error("Please sign in before upgrading.");
+      // The hint distinguishes "no token was sent" from "token was rejected"
+      // so a stuck checkout is diagnosable from the console alone.
+      throw new Error(
+        `Please sign in before upgrading.${payload.hint ? ` [${payload.hint}]` : ""}`,
+      );
     }
     const message = payload?.message ?? payload?.error ?? "Checkout creation failed";
     console.error("[lemonsqueezy] checkout.failed", { tier, message });
