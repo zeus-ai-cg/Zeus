@@ -51,17 +51,19 @@ type Props = {
 
 // The server appends "[zeus-engineer-error] <raw provider message>" to the
 // stream when generation fails (see /api/engineer). Translate the common
-// cases into something a non-developer can act on; never leak raw internals.
+// cases into something clear and actionable. English only, per owner policy.
 function friendlyEngineerError(raw: string | undefined): string {
   const msg = (raw ?? "").replace(/^\s*\[zeus-engineer-error\]\s*/, "");
   if (/invalid authentication credentials|API key|API_KEY/i.test(msg))
-    return "Zeus ke server par AI model ki key abhi kaam nahi kar rahi. Thodi der baad try karein — team ko pata chala hua hai.";
+    return "The AI model key on Zeus servers isn't working right now. Please try again later — the team has been notified.";
   if (/could not parse|No object generated/i.test(msg))
-    return "AI model se project generate karte waqt masla hua. Dobara try karein.";
+    return "Something went wrong while generating your project. Please try again.";
   if (/timeout|aborted|AbortError/i.test(msg))
-    return "Generation me bohat waqt lag gaya. Chhota prompt try karein ya dobara start karein.";
+    return "Generation took too long. Try a shorter prompt or start again.";
   if (/quota|rate.?limit|429/i.test(msg))
-    return "Model ki limit hit ho gayi hai. Kuch der baad try karein.";
+    return "The model hit its usage limit. Please try again in a little while.";
+  if (/engineer_unavailable|temporarily unavailable|providers/i.test(msg))
+    return "Zeus AI's engineering engine is temporarily unavailable. Please try again in a few minutes.";
   return msg ? `Generation failed: ${msg.slice(0, 160)}` : "Something went wrong generating this project.";
 }
 

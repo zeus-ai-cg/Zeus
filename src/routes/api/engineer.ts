@@ -358,7 +358,7 @@ export const Route = createFileRoute("/api/engineer")({
               JSON.stringify({
                 error: "engineer_unavailable",
                 message:
-                  "Zeus ke AI providers abhi available nahi hain. Kuch der baad try karein.",
+                  "Zeus AI's engineering engine is temporarily unavailable. Please try again in a few minutes.",
                 // Temporary diagnostics — provider error strings only, no secrets.
                 attempts: attemptErrors,
               }),
