@@ -62,16 +62,7 @@ function buildUnauthorized(hint: string) {
  * returned userId/email come ONLY from verified claims — the request body
  * can never choose which account gets upgraded.
  */
-async function authenticateCheckoutRequest(
-  request: Request,
-): Promise<
-  | {
-      ok: true;
-      identity: ReturnType<typeof resolveCheckoutIdentity>;
-      supabase: ReturnType<typeof createClient>;
-    }
-  | { ok: false; hint: string }
-> {
+async function authenticateCheckoutRequest(request: Request) {
   const token = parseBearerToken(request.headers.get("authorization"));
   if (!token) return { ok: false, hint: "no_token_in_request" };
 
@@ -114,7 +105,7 @@ export const Route = createFileRoute("/api/lemonsqueezy/checkout")({
         try {
           const auth = await authenticateCheckoutRequest(request);
           if (!auth.ok) {
-            return buildUnauthorized(auth.hint);
+            return buildUnauthorized(auth.hint ?? "no_token_in_request");
           }
           if (!auth.identity) {
             return buildUnauthorized("identity_unresolvable");

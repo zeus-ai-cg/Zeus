@@ -175,20 +175,52 @@ export const Route = createFileRoute("/api/engineer")({
             if (incErr) throw new Error(incErr.message);
           }
 
-          const providerInfo = getProvider(modelResolution.provider);
+          // Structured-output routing fix: streamObject needs a model that
+          // genuinely honors JSON-schema output. Probes proved the platform
+          // default (Ox Alpha "stealth/ox-alpha" via OpenRouter) streams
+          // unparseable text for ANY schema ("No object generated: could
+          // not parse"), which left clients spinning forever, while
+          // gemini-2.5-flash produced a complete valid object in ~11s.
+          // Chat (streamText) is unaffected and keeps Ox Alpha; Engineer
+          // therefore prefers the platform Gemini key whenever the resolved
+          // model is the non-BYOK Ox Alpha fallback. BYOK keys always win —
+          // the user chose that provider themselves.
+          let engineerResolution = modelResolution;
+          if (!modelResolution.isByok && modelResolution.provider === "oxalpha") {
+            const geminiKey = process.env.GEMINI_API_KEY ?? "";
+            if (geminiKey.trim()) {
+              engineerResolution = {
+                provider: "gemini",
+                modelId: "gemini-2.5-flash",
+                apiKey: geminiKey,
+                isByok: false,
+              };
+            }
+          }
+
+          // Defense in depth: env values pasted WITH wrapping quotes would
+          // otherwise be sent to the gateway as literal characters.
+          const cleanModelId = (id: string) => id.replace(/^["'\s]+|["'\s]+$/g, "");
+
+          const providerInfo = getProvider(engineerResolution.provider);
           let model;
-          if (modelResolution.provider === "gemini")
-            model = createGoogleGenerativeAI({ apiKey: modelResolution.apiKey })(
-              modelResolution.modelId,
+          if (engineerResolution.provider === "gemini")
+            model = createGoogleGenerativeAI({ apiKey: engineerResolution.apiKey ?? undefined })(
+              cleanModelId(engineerResolution.modelId),
             );
-          else if (modelResolution.provider === "anthropic")
-            model = createAnthropic({ apiKey: modelResolution.apiKey })(modelResolution.modelId);
+          else if (engineerResolution.provider === "anthropic")
+            model = createAnthropic({ apiKey: engineerResolution.apiKey ?? undefined })(
+              cleanModelId(engineerResolution.modelId),
+            );
           else if (providerInfo?.openAiCompatible)
             model = createOpenAI({
-              apiKey: modelResolution.apiKey,
+              apiKey: engineerResolution.apiKey ?? undefined,
               baseURL: providerInfo.openAiCompatible.baseURL,
-            })(modelResolution.modelId);
-          else model = createOpenAI({ apiKey: modelResolution.apiKey })(modelResolution.modelId);
+            })(cleanModelId(engineerResolution.modelId));
+          else
+            model = createOpenAI({ apiKey: engineerResolution.apiKey ?? undefined })(
+              cleanModelId(engineerResolution.modelId),
+            );
 
           const result = streamObject({
             model,
