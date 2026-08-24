@@ -176,117 +176,207 @@ export const Route = createFileRoute("/api/engineer")({
           }
 
           // Structured-output routing fix: streamObject needs a model that
-          // genuinely honors JSON-schema output. Probes proved the platform
-          // default (Ox Alpha "stealth/ox-alpha" via OpenRouter) streams
-          // unparseable text for ANY schema ("No object generated: could
-          // not parse"), which left clients spinning forever, while
-          // gemini-2.5-flash produced a complete valid object in ~11s.
-          // Chat (streamText) is unaffected and keeps Ox Alpha; Engineer
-          // therefore prefers the platform Gemini key whenever the resolved
-          // model is the non-BYOK Ox Alpha fallback. BYOK keys always win —
-          // the user chose that provider themselves.
-          let engineerResolution = modelResolution;
-          if (!modelResolution.isByok && modelResolution.provider === "oxalpha") {
-            const geminiKey = process.env.GEMINI_API_KEY ?? "";
-            if (geminiKey.trim()) {
-              engineerResolution = {
-                provider: "gemini",
-                modelId: "gemini-2.5-flash",
-                apiKey: geminiKey,
-                isByok: false,
-              };
-            }
-          }
-
-          // Defense in depth: env values pasted WITH wrapping quotes would
-          // otherwise be sent to the gateway as literal characters.
+          // genuinely honors JSON-schema output. Live probes proved:
+          //  - Ox Alpha "stealth/ox-alpha" streams unparseable text for ANY
+          //    schema ("No object generated: could not parse") — chat's
+          //    streamText is unaffected, but Engineer can NEVER use it.
+          //  - Direct Gemini works when the platform key is valid, and
+          //    google/gemini-2.5-flash through OpenRouter works too.
+          // Engineer therefore tries an ordered candidate chain and skips a
+          // provider within seconds if it errors before producing output.
+          // BYOK users still get exactly their own provider, untouched.
           const cleanModelId = (id: string) => id.replace(/^["'\s]+|["'\s]+$/g, "");
           const cleanApiKey = (key: string | null) =>
             key ? key.replace(/^["'\s]+|["'\s]+$/g, "") : key;
 
-          const providerInfo = getProvider(engineerResolution.provider);
-          let model;
-          if (engineerResolution.provider === "gemini")
-            model = createGoogleGenerativeAI({
-              apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined,
-            })(cleanModelId(engineerResolution.modelId));
-          else if (engineerResolution.provider === "anthropic")
-            model = createAnthropic({ apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined })(
-              cleanModelId(engineerResolution.modelId),
-            );
-          else if (providerInfo?.openAiCompatible)
-            model = createOpenAI({
-              apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined,
-              baseURL: providerInfo.openAiCompatible.baseURL,
-            })(cleanModelId(engineerResolution.modelId));
-          else
-            model = createOpenAI({ apiKey: cleanApiKey(engineerResolution.apiKey) ?? undefined })(
-              cleanModelId(engineerResolution.modelId),
+          type Candidate = { label: string; modelId: string; model: unknown };
+          const buildOpenAiCompatible = (
+            apiKey: string,
+            baseURL?: string,
+            modelId?: string,
+          ) =>
+            createOpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })(
+              cleanModelId(modelId ?? "stealth/ox-alpha"),
             );
 
+          const candidates: Candidate[] = [];
+          if (!modelResolution.isByok) {
+            const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY ?? "") ?? "";
+            if (geminiKey) {
+              candidates.push({
+                label: "gemini",
+                modelId: "gemini-2.5-flash",
+                model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-2.5-flash"),
+              });
+            }
+            const openRouterKey = cleanApiKey(process.env.QWEN_API_KEY ?? "") ?? "";
+            if (openRouterKey) {
+              candidates.push({
+                label: "openrouter-gemini",
+                modelId: "google/gemini-2.5-flash",
+                model: buildOpenAiCompatible(
+                  openRouterKey,
+                  "https://openrouter.ai/api/v1",
+                  "google/gemini-2.5-flash",
+                ),
+              });
+            }
+          } else {
+            const providerInfo = getProvider(modelResolution.provider);
+            const apiKey = cleanApiKey(modelResolution.apiKey);
+            let model: unknown;
+            if (modelResolution.provider === "gemini")
+              model = createGoogleGenerativeAI({ apiKey: apiKey ?? undefined })(
+                cleanModelId(modelResolution.modelId),
+              );
+            else if (modelResolution.provider === "anthropic")
+              model = createAnthropic({ apiKey: apiKey ?? undefined })(
+                cleanModelId(modelResolution.modelId),
+              );
+            else if (providerInfo?.openAiCompatible)
+              model = buildOpenAiCompatible(
+                apiKey ?? "",
+                providerInfo.openAiCompatible.baseURL,
+                modelResolution.modelId,
+              );
+            else model = buildOpenAiCompatible(apiKey ?? "", undefined, modelResolution.modelId);
+            candidates.push({
+              label: modelResolution.provider,
+              modelId: modelResolution.modelId,
+              model,
+            });
+          }
+
+          const requestStartedAt = Date.now();
+          const encoder = new TextEncoder();
           let lastStreamError: string | null = null;
-          const result = streamObject({
-            model,
-            schema: engineerProjectSchema,
-            system: SYSTEM_PROMPT,
-            prompt: `Build the following as a complete project. Think through what the user really needs, decide the stack and scope yourself, then generate:\n\n${prompt}`,
-            // Hard stop so a stalled provider surfaces as an error on the
-            // client instead of an eternal spinner.
-            abortSignal: AbortSignal.timeout(240_000),
-            onError: (error) => {
-              const err = (error as { error?: { message?: string } })?.error;
-              lastStreamError =
-                err?.message ??
-                (typeof error === "object" && error !== null
-                  ? JSON.stringify(error).slice(0, 500)
-                  : String(error));
-              console.error("[engineer] stream error", lastStreamError);
-            },
-            onFinish: async ({ object }) => {
-              // Zeus Credits (Feature 6) — logged once with the real file
-              // count, not the pre-generation estimate shown to the user.
-              const fileCount = object?.files?.length ?? 0;
-              const credits = computeEngineerCreditsFromFileCount(fileCount);
-              await logCredits(supabase, userId, "engineer_project", credits, {
-                fileCount,
-                prompt: prompt.slice(0, 200),
+          let winner: {
+            label: string;
+            modelId: string;
+            iter: AsyncIterator<string>;
+            firstDelta: string;
+          } | null = null;
+
+          for (const candidate of candidates) {
+            lastStreamError = null;
+            // Only the attempt the client actually receives may touch billing.
+            const attemptActive = { current: false };
+            let result: ReturnType<typeof streamObject>;
+            try {
+              result = streamObject({
+                model: candidate.model as Parameters<typeof streamObject>[0]["model"],
+                schema: engineerProjectSchema,
+                system: SYSTEM_PROMPT,
+                prompt: `Build the following as a complete project. Think through what the user really needs, decide the stack and scope yourself, then generate:\n\n${prompt}`,
+                // Hard stop so a stalled provider surfaces as an error on the
+                // client instead of an eternal spinner.
+                abortSignal: AbortSignal.timeout(
+                  Math.max(30_000, 240_000 - (Date.now() - requestStartedAt)),
+                ),
+                onError: (error) => {
+                  const err = (error as { error?: { message?: string } })?.error;
+                  lastStreamError =
+                    err?.message ??
+                    (typeof error === "object" && error !== null
+                      ? JSON.stringify(error).slice(0, 500)
+                      : String(error));
+                  console.error(`[engineer] ${candidate.label} stream error`, lastStreamError);
+                },
+                onFinish: async ({ object }) => {
+                  if (!attemptActive.current) return;
+                  await finalizeEngineerRun(object);
+                },
               });
 
-              // Issues 2 & 3 — a project only counts as "complete" if it
-              // actually produced files (an empty/failed generation must
-              // not burn the user's one free project). Free plan: consume
-              // the ENTIRE remaining question balance and permanently lock
-              // Engineer Mode via the SECURITY DEFINER RPC (questions_used
-              // / engineer_free_project_used are frozen against direct
-              // writes from this user-JWT-scoped client — see
-              // supabase/migrations/20260803090000_billing_details_and_engineer_lock.sql).
-              // Pro/Ultimate: no-op, they keep the existing per-request
-              // increment_usage accounting from above (1 credit/project for
-              // Pro, no gating at all for Ultimate).
-              if (!modelResolution.isByok && planTier === "free" && fileCount > 0) {
-                const { error: consumeErr } = await supabase.rpc("consume_free_engineer_project", {
-                  p_user_id: userId,
-                });
-                if (consumeErr) {
-                  console.error("[engineer] consume_free_engineer_project failed", consumeErr);
-                }
+              // Peek at the stream WITHOUT emitting: dead keys fail in <2s,
+              // so we fall through to the next candidate for free. Once real
+              // text arrives this provider is committed.
+              const iter = result.textStream[Symbol.asyncIterator]();
+              const first = (await Promise.race([
+                iter.next(),
+                new Promise<{ done: true }>((resolve) =>
+                  setTimeout(() => resolve({ done: true }), 20_000),
+                ),
+              ])) as IteratorResult<string> | { done: true };
+              if (!first.done && !first.value.startsWith("[zeus-engineer-error]") && !lastStreamError) {
+                attemptActive.current = true;
+                winner = {
+                  label: candidate.label,
+                  modelId: candidate.modelId,
+                  iter,
+                  firstDelta: first.value,
+                };
+                break;
               }
-            },
-          });
+              await iter.return?.(undefined).catch(() => {});
+            } catch (attemptError) {
+              console.error(`[engineer] ${candidate.label} attempt crashed`, attemptError);
+            }
+          }
+
+          async function finalizeEngineerRun(object: unknown) {
+            // Zeus Credits (Feature 6) — logged once with the real file
+            // count, not the pre-generation estimate shown to the user.
+            const fileCount =
+              (object as { files?: unknown[] } | null | undefined)?.files?.length ?? 0;
+            if (fileCount === 0) return;
+            const credits = computeEngineerCreditsFromFileCount(fileCount);
+            await logCredits(supabase, userId, "engineer_project", credits, {
+              fileCount,
+              prompt: prompt.slice(0, 200),
+            });
+
+            // Issues 2 & 3 — a project only counts as "complete" if it
+            // actually produced files (an empty/failed generation must
+            // not burn the user's one free project). Free plan: consume
+            // the ENTIRE remaining question balance and permanently lock
+            // Engineer Mode via the SECURITY DEFINER RPC (questions_used
+            // / engineer_free_project_used are frozen against direct
+            // writes from this user-JWT-scoped client — see
+            // supabase/migrations/20260803090000_billing_details_and_engineer_lock.sql).
+            // Pro/Ultimate: no-op, they keep the existing per-request
+            // increment_usage accounting from above (1 credit/project for
+            // Pro, no gating at all for Ultimate).
+            if (!modelResolution.isByok && planTier === "free") {
+              const { error: consumeErr } = await supabase.rpc("consume_free_engineer_project", {
+                p_user_id: userId,
+              });
+              if (consumeErr) {
+                console.error("[engineer] consume_free_engineer_project failed", consumeErr);
+              }
+            }
+          }
+
+          if (!winner) {
+            console.error("[engineer] all providers failed", {
+              tried: candidates.map((c) => c.label),
+              lastError: lastStreamError,
+            });
+            return new Response(
+              JSON.stringify({
+                error: "engineer_unavailable",
+                message:
+                  "Zeus ke AI providers abhi available nahi hain. Kuch der baad try karein.",
+              }),
+              { status: 503, headers: { "Content-Type": "application/json" } },
+            );
+          }
 
           // Manual text-stream passthrough: identical bytes to
           // toTextStreamResponse() on success, but when the provider errors
-          // we append a visible sentinel so clients surface a failure
-          // instead of spinning forever on an empty 200 stream.
-          const encoder = new TextEncoder();
+          // mid-stream we append a visible sentinel so clients surface a
+          // failure instead of spinning forever.
           const streamBody = new ReadableStream<Uint8Array>({
             async start(controller) {
+              controller.enqueue(encoder.encode(winner.firstDelta));
               try {
-                for await (const delta of result.textStream) {
-                  controller.enqueue(encoder.encode(delta));
+                for (;;) {
+                  const next = await winner.iter.next();
+                  if (next.done) break;
+                  controller.enqueue(encoder.encode(next.value));
                 }
               } catch {
-                // stream consumer error — already reported via onError
+                // consumer-side abort — already reported via onError
               }
               if (lastStreamError) {
                 controller.enqueue(
@@ -299,8 +389,8 @@ export const Route = createFileRoute("/api/engineer")({
           return new Response(streamBody, {
             headers: {
               "Content-Type": "text/plain; charset=utf-8",
-              "X-Zeus-Engineer-Provider": engineerResolution.provider,
-              "X-Zeus-Engineer-Model": cleanModelId(engineerResolution.modelId),
+              "X-Zeus-Engineer-Provider": winner.label,
+              "X-Zeus-Engineer-Model": cleanModelId(winner.modelId),
             },
           });
         } catch (error) {
