@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getDesktopAuthBridge } from "@/lib/desktop-auth";
 import { resetAuthSessionCache } from "@/lib/auth-session";
+import { recoverOAuthHashSession } from "@/lib/oauth-hash-recovery";
 import { ThemeProvider } from "@/lib/theme";
 import { SITE_URL } from "@/lib/site";
 
@@ -176,6 +177,14 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+
+  // OAuth hash recovery: if the Supabase callback arrived as an
+  // #access_token fragment that supabase-js never converted into a session
+  // (router race), pick it up deterministically. setSession fires SIGNED_IN,
+  // so the listener below refreshes everything automatically.
+  useEffect(() => {
+    void recoverOAuthHashSession();
+  }, []);
 
   useEffect(() => {
     const {
