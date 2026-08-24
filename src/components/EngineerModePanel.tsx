@@ -49,6 +49,22 @@ type Props = {
   onSaved?: (projectId: string) => void;
 };
 
+// The server appends "[zeus-engineer-error] <raw provider message>" to the
+// stream when generation fails (see /api/engineer). Translate the common
+// cases into something a non-developer can act on; never leak raw internals.
+function friendlyEngineerError(raw: string | undefined): string {
+  const msg = (raw ?? "").replace(/^\s*\[zeus-engineer-error\]\s*/, "");
+  if (/invalid authentication credentials|API key|API_KEY/i.test(msg))
+    return "Zeus ke server par AI model ki key abhi kaam nahi kar rahi. Thodi der baad try karein — team ko pata chala hua hai.";
+  if (/could not parse|No object generated/i.test(msg))
+    return "AI model se project generate karte waqt masla hua. Dobara try karein.";
+  if (/timeout|aborted|AbortError/i.test(msg))
+    return "Generation me bohat waqt lag gaya. Chhota prompt try karein ya dobara start karein.";
+  if (/quota|rate.?limit|429/i.test(msg))
+    return "Model ki limit hit ho gayi hai. Kuch der baad try karein.";
+  return msg ? `Generation failed: ${msg.slice(0, 160)}` : "Something went wrong generating this project.";
+}
+
 // ⚡ Zeus Project Engineer — Feature 1 UI.
 //
 // Deliberately NOT styled like the normal chat bubble list — this is the
@@ -377,7 +393,7 @@ export function EngineerModePanel({ prompt, onClose, onSaved }: Props) {
 
               {failed && (
                 <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                  Something went wrong generating this project. {error?.message ?? ""}
+                  <span className="font-medium">{friendlyEngineerError(error?.message)}</span>
                   <div className="mt-2">
                     <Button
                       size="sm"
