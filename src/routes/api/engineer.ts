@@ -250,6 +250,7 @@ export const Route = createFileRoute("/api/engineer")({
           const requestStartedAt = Date.now();
           const encoder = new TextEncoder();
           let lastStreamError: string | null = null;
+          const attemptErrors: Array<{ label: string; error: string }> = [];
           let winner: {
             label: string;
             modelId: string;
@@ -308,8 +309,16 @@ export const Route = createFileRoute("/api/engineer")({
                 };
                 break;
               }
+              attemptErrors.push({
+                label: candidate.label,
+                error: (lastStreamError ?? (first.done ? "timeout/no output" : "empty first chunk")).slice(0, 300),
+              });
               await iter.return?.(undefined).catch(() => {});
             } catch (attemptError) {
+              attemptErrors.push({
+                label: candidate.label,
+                error: String((attemptError as Error)?.message ?? attemptError).slice(0, 300),
+              });
               console.error(`[engineer] ${candidate.label} attempt crashed`, attemptError);
             }
           }
@@ -357,6 +366,8 @@ export const Route = createFileRoute("/api/engineer")({
                 error: "engineer_unavailable",
                 message:
                   "Zeus ke AI providers abhi available nahi hain. Kuch der baad try karein.",
+                // Temporary diagnostics — provider error strings only, no secrets.
+                attempts: attemptErrors,
               }),
               { status: 503, headers: { "Content-Type": "application/json" } },
             );
