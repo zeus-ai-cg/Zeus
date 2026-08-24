@@ -100,12 +100,22 @@ export async function openCheckout(
   let token = sessionData.session?.access_token;
 
   // Resilience: a stale/expired access token would 401 on the server even
-  // though the user IS signed in. Force one refresh round-trip before giving
-  // up, so an idle tab doesn't block checkout.
+  // though the user IS signed in. Recovery ladder before giving up:
+  // 1) getUser() forces supabase-js to validate/refresh via the refresh token
+  // 2) explicit refreshSession()
+  // 3) re-read the session — recovered tokens are picked up here
   if (!token) {
-    await supabase.auth.refreshSession();
+    await supabase.auth.getUser().catch(() => null);
+    await supabase.auth.refreshSession().catch(() => null);
     const retry = await supabase.auth.getSession();
     token = retry.data.session?.access_token;
+  }
+
+  if (!token) {
+    console.error(
+      "[lemonsqueezy] checkout.no_session",
+      "No usable Supabase session in this browser — user must log in again.",
+    );
   }
 
   const response = await fetch(CHECKOUT_ROUTE, {
