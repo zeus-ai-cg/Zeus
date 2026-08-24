@@ -51,7 +51,10 @@ export function isLemonSqueezyConfigured(tier: CheckoutTier = "pro") {
   return Boolean(tierCheckoutUrl(tier));
 }
 
-export async function initLemonSqueezy(tier: CheckoutTier = "pro"): Promise<void> {
+export async function initLemonSqueezy(
+  tier: CheckoutTier = "pro",
+  token?: string | null,
+): Promise<void> {
   if (initPromises[tier]) return initPromises[tier];
 
   initPromises[tier] = (async () => {
@@ -59,7 +62,10 @@ export async function initLemonSqueezy(tier: CheckoutTier = "pro"): Promise<void
       console.info("[lemonsqueezy] init.request", { tier, route: CHECKOUT_ROUTE });
       const response = await fetch(CHECKOUT_ROUTE, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ tier, preview: true }),
       });
 
@@ -68,7 +74,11 @@ export async function initLemonSqueezy(tier: CheckoutTier = "pro"): Promise<void
         message?: string;
       } | null;
 
-      if (!response.ok) {
+      // The probe must NOT block the real checkout attempt. A 401 here means
+      // the session wasn't ready yet — openCheckout's own authenticated call
+      // (with its recovery ladder) is the authority. Only config problems
+      // (5xx) are worth surfacing at this stage.
+      if (!response.ok && response.status !== 401) {
         throw new Error(payload?.message ?? "Lemon Squeezy checkout could not be initialized.");
       }
 
@@ -91,10 +101,9 @@ export async function openCheckout(
   // header below). A client-supplied id could otherwise upgrade any account.
   opts: { email?: string; userId?: string } = {},
 ) {
-  await initLemonSqueezy(tier);
-
-  console.info("[lemonsqueezy] checkout.request", { tier, email: Boolean(opts.email) });
-
+  // Resolve the session FIRST so the init probe can also authenticate — the
+  // server rejects every checkout-route request without a Bearer token,
+  // including preview probes (H2 hardening).
   const { supabase } = await import("@/integrations/supabase/client");
   const { data: sessionData } = await supabase.auth.getSession();
   let token = sessionData.session?.access_token;
@@ -117,6 +126,10 @@ export async function openCheckout(
       "No usable Supabase session in this browser — user must log in again.",
     );
   }
+
+  await initLemonSqueezy(tier, token);
+
+  console.info("[lemonsqueezy] checkout.request", { tier, email: Boolean(opts.email), hadToken: Boolean(token) });
 
   const response = await fetch(CHECKOUT_ROUTE, {
     method: "POST",
