@@ -201,27 +201,17 @@ export const Route = createFileRoute("/api/engineer")({
 
           const candidates: Candidate[] = [];
           if (!modelResolution.isByok) {
-            // Aug 2026: Google retired gemini-2.5-flash for NEW API keys
-            // ("use models/gemini-3.6-flash"). Newer generations must be used
-            // or every fresh platform key gets rejected.
+            // Aug 2026 key policy (owner-approved): Ox Alpha powers every
+            // streamText feature (chat, terminal, reviews...), while
+            // structured generation is Gemini-only — stealth/ox-alpha cannot
+            // honor JSON schemas at all. Note: Google retired gemini-2.5-flash
+            // for NEW API keys; gemini-3.6-flash is the supported generation.
             const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY ?? "") ?? "";
             if (geminiKey) {
               candidates.push({
                 label: "gemini",
                 modelId: "gemini-3.6-flash",
                 model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-3.6-flash"),
-              });
-            }
-            const openRouterKey = cleanApiKey(process.env.QWEN_API_KEY ?? "") ?? "";
-            if (openRouterKey) {
-              candidates.push({
-                label: "openrouter-gemini",
-                modelId: "google/gemini-3.6-flash",
-                model: buildOpenAiCompatible(
-                  openRouterKey,
-                  "https://openrouter.ai/api/v1",
-                  "google/gemini-3.6-flash",
-                ),
               });
             }
           } else {

@@ -22,15 +22,28 @@
 | Branding | All third-party AI branding removed from UI ("Powered by Google Gemini" badge gone); Google mention ONLY remains in privacy.tsx (legal transparency — keep) |
 | Socials | Footer has real links: X @CodeMasterAI_, github.com/zeus-ai-cg/Zeus, LinkedIn zeus-ai-799001426, IG zeusai.cg, FB profile 61592043411553, Threads @zeusai.cg |
 | Fake reviews | Removed from homepage; honest "Try it on your own project" band instead |
+| **Engineer mode** | **FIXED & LIVE-VERIFIED (Aug 2026).** Root causes: (1) Ox Alpha `stealth/ox-alpha` cannot do structured output at all; (2) platform GEMINI key was an expired temp token (`AQ.A…`, not `AIza…`); (3) Google retired `gemini-2.5-flash` for NEW keys → now on `gemini-3.6-flash`. Route now has an ordered candidate chain with dead-key fast-skip (<2s), in-stream `[zeus-engineer-error]` sentinel, 503 JSON with per-attempt diagnostics when everything fails, and billing only fires for the attempt actually delivered |
+| **Checkout** | FIXED end-to-end (init-probe auth bug → token-first flow), PKCE OAuth, hash-recovery, duplicate-purchase guard (client "Checking your plan…" + server 409 `already_subscribed`) |
+
+### API key policy (owner-approved Aug 2026)
+
+| Key | Purpose |
+|---|---|
+| `OxALPHA_API_KEY` | ALL streamText features by default: chat, terminal, git tools, modifications, code review, smart continue (via OpenRouter `stealth/ox-alpha`) |
+| `GEMINI_API_KEY` | **Engineer mode ONLY** (structured output needs a schema-capable model). Must be a REAL AI Studio key starting `AIza…` — the old `AQ.A…` value was a temporary OAuth-style token that expired and caused the engineer outage |
+| `GROQ_API_KEY` | Server-side voice transcription (`/api/voice/transcribe`) used by desktop app |
+| `QWEN_API_KEY` | Actually a spare OpenRouter key — currently UNUSED in code (kept as backup) |
+| `DEEPSEEK_API_KEY` / `CEREBRAS_API_KEY` | Dead/expired platform copies; providers remain available to BYOK users with their own keys |
+| `LEMONSQUEEZY_*_VARIANT_ID` | Pro = `2048474` ($5/mo), Ultimate = `2048475` ($10/mo, LS product name "Zeus AI Unlimited") |
 
 **Key gotchas for future sessions:**
 - Repo canonical URL is `github.com/zeus-ai-cg/Zeus` (old Haidersiddique942 redirects). Local branch `release/zeus-vscode-0.3.0`; deploy = `git push origin release/zeus-vscode-0.3.0:main` (main checked out in another worktree).
 - Publishable key format is new Supabase `sb_publishable_…` — it IS public-safe.
-- Vercel env vars must be RAW values, NO quotes (quotes broke Google login once).
+- Vercel env vars must be RAW values, NO quotes (quotes broke Google login once). Engineer route strips wrapping quotes from model ids/keys as defense-in-depth anyway.
 - Vercel Hobby plan = serverless functions hard-capped ~60s. Engineer mode (long generations) may still die on free plan despite UI showing higher settings. If engineer times out on big projects → Pro plan needed (300s).
 - Engineer detection regexes are English-verb only (`engineer.schema.ts` ~160-204).
 - Free-plan engineer lock: one project ever, consumed AFTER successful generation with files.
-- Remaining backlog (user approval pending): audit H1-H8 fixes (rate limiter, quota TOCTOU, noopener, auto-updater consumer…), M1-M15 mediums, `tsx` missing from devDependencies (`npm test` broken — use `npx tsx scripts/test-billing.mjs`), `LEMONSQUEEZY_ULTIMATE_VARIANT_ID` still empty in .env/Vercel (Ultimate checkout fails until set).
+- Remaining backlog (user approval pending): audit H1-H8 fixes (rate limiter, quota TOCTOU, noopener, auto-updater consumer…), M1-M15 mediums, `tsx` missing from devDependencies (`npm test` broken — use `npx tsx scripts/test-billing.mjs`).
 - Secrets hygiene: NEVER print secret VALUES in chat; names/prefixes only.
 
 ---
