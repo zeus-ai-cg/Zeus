@@ -31,17 +31,15 @@ async function restFetch(url: string, token: string, opts: RequestInit = {}): Pr
 export const getEnabledBuiltinSkills = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const base = process.env.SUPABASE_URL!;
-    const url = `${base}/rest/v1/profiles?id=eq.${context.userId}&select=enabled_skill_ids,plan`;
-    const res = await restFetch(url, context.token);
-    const rows = (await res.json()) as Array<{
-      enabled_skill_ids: string[];
-      plan: string;
-    }>;
-    const row = rows?.[0];
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("profiles")
+      .select("enabled_skill_ids, plan")
+      .eq("id", context.userId)
+      .maybeSingle();
     return {
-      enabledIds: row?.enabled_skill_ids ?? [],
-      plan: row?.plan ?? "free",
+      enabledIds: (row as Record<string, unknown> | null)?.enabled_skill_ids as string[] ?? [],
+      plan: (row as Record<string, unknown> | null)?.plan as string ?? "free",
     };
   });
 
@@ -49,18 +47,15 @@ export const toggleBuiltinSkill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ skillId: z.string(), enabled: z.boolean() }).parse(input))
   .handler(async ({ context, data }) => {
-    const base = process.env.SUPABASE_URL!;
-    const token = context.token;
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("profiles")
+      .select("enabled_skill_ids, plan")
+      .eq("id", context.userId)
+      .maybeSingle();
 
-    // Get current enabled IDs
-    const getUrl = `${base}/rest/v1/profiles?id=eq.${context.userId}&select=enabled_skill_ids,plan`;
-    const getRes = await restFetch(getUrl, token);
-    const rows = (await getRes.json()) as Array<{
-      enabled_skill_ids: string[];
-      plan: string;
-    }>;
-    const current = rows?.[0]?.enabled_skill_ids ?? [];
-    const plan = rows?.[0]?.plan ?? "free";
+    const current = (row as Record<string, unknown> | null)?.enabled_skill_ids as string[] ?? [];
+    const plan = (row as Record<string, unknown> | null)?.plan as string ?? "free";
 
     // Plan limits
     const maxBuiltin = plan === "free" ? 3 : 8;
@@ -75,12 +70,12 @@ export const toggleBuiltinSkill = createServerFn({ method: "POST" })
       updated = current.filter((id) => id !== data.skillId);
     }
 
-    const patchUrl = `${base}/rest/v1/profiles?id=eq.${context.userId}`;
-    const patchRes = await restFetch(patchUrl, token, {
-      method: "PATCH",
-      body: JSON.stringify({ enabled_skill_ids: updated }),
-    });
-    if (!patchRes.ok) throw new Error("Failed to update skill toggle");
+    const { error: patchErr } = await sb
+      .from("profiles")
+      .update({ enabled_skill_ids: updated } as never)
+      .eq("id", context.userId);
+
+    if (patchErr) throw new Error("Failed to update skill toggle");
     return { enabledIds: updated };
   });
 
@@ -113,11 +108,14 @@ export const createCustomSkill = createServerFn({ method: "POST" })
     const base = process.env.SUPABASE_URL!;
     const token = context.token;
 
-    // Check plan allows custom skills
-    const profileUrl = `${base}/rest/v1/profiles?id=eq.${context.userId}&select=plan`;
-    const profileRes = await restFetch(profileUrl, token);
-    const profileRows = (await profileRes.json()) as Array<{ plan: string }>;
-    const plan = profileRows?.[0]?.plan ?? "free";
+    // Check plan allows custom skills via Supabase client
+    const sb = context.supabase as any;
+    const { data: profileRow } = await sb
+      .from("profiles")
+      .select("plan")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const plan = (profileRow as Record<string, unknown> | null)?.plan as string ?? "free";
     if (plan === "free") {
       throw new Error("Custom skills require Pro or Ultimate plan.");
     }

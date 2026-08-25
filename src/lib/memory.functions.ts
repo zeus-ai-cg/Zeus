@@ -58,19 +58,18 @@ export const createMemory = createServerFn({ method: "POST" })
     const base = process.env.SUPABASE_URL!;
     const token = context.token;
 
-    // Check memory_enabled and plan via RPC-safe raw query
-    const profileUrl = `${base}/rest/v1/profiles?id=eq.${context.userId}&select=plan,memory_enabled`;
-    const profileRes = await restQuery(profileUrl, token);
-    const profileRows = (await profileRes.json()) as Array<{
-      plan: string;
-      memory_enabled: boolean;
-    }>;
-    const profile = profileRows?.[0];
-    if (!profile?.memory_enabled) {
+    // Check memory_enabled and plan via Supabase client (profiles table is typed)
+    const sb = context.supabase as any;
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("plan, memory_enabled")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (!(profile as Record<string, unknown> | null)?.memory_enabled) {
       throw new Error("Memory feature is disabled in your settings.");
     }
 
-    const plan = profile.plan ?? "free";
+    const plan = (profile as Record<string, unknown> | null)?.plan as string ?? "free";
     const limit = MEMORY_LIMITS[plan] ?? MEMORY_LIMITS.free;
 
     // Count active
@@ -131,18 +130,16 @@ export const clearMemories = createServerFn({ method: "POST" })
 export const getMemorySettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const base = process.env.SUPABASE_URL!;
-    const url = `${base}/rest/v1/profiles?id=eq.${context.userId}&select=memory_enabled,plan`;
-    const res = await restQuery(url, context.token);
-    const rows = (await res.json()) as Array<{
-      memory_enabled: boolean;
-      plan: string;
-    }>;
-    const row = rows?.[0];
+    const sb = context.supabase as any;
+    const { data: row } = await sb
+      .from("profiles")
+      .select("memory_enabled, plan")
+      .eq("id", context.userId)
+      .maybeSingle();
     return {
-      enabled: row?.memory_enabled ?? true,
-      plan: row?.plan ?? "free",
-      limit: MEMORY_LIMITS[row?.plan ?? "free"] ?? MEMORY_LIMITS.free,
+      enabled: (row as Record<string, unknown> | null)?.memory_enabled ?? true,
+      plan: (row as Record<string, unknown> | null)?.plan ?? "free",
+      limit: MEMORY_LIMITS[(row as Record<string, unknown> | null)?.plan as string ?? "free"] ?? MEMORY_LIMITS.free,
     };
   });
 
@@ -150,12 +147,11 @@ export const setMemorySettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
   .handler(async ({ context, data }) => {
-    const base = process.env.SUPABASE_URL!;
-    const url = `${base}/rest/v1/profiles?id=eq.${context.userId}`;
-    const res = await restQuery(url, context.token, {
-      method: "PATCH",
-      body: JSON.stringify({ memory_enabled: data.enabled }),
-    });
-    if (!res.ok) throw new Error("Failed to update memory settings");
+    const sb = context.supabase as any;
+    const { error } = await sb
+      .from("profiles")
+      .update({ memory_enabled: data.enabled } as never)
+      .eq("id", context.userId);
+    if (error) throw new Error("Failed to update memory settings");
     return { ok: true };
   });

@@ -58,13 +58,13 @@ export function MemoryPanel() {
 
   const { data: settings } = useQuery({
     queryKey: ["memory-settings"],
-    queryFn: () => getSettingsFn(),
+    queryFn: () => getSettingsFn() as Promise<{ enabled: boolean; plan: string; limit: number }>,
   });
 
   const { data: memories = [] } = useQuery({
     queryKey: ["memories"],
     queryFn: () => listFn() as unknown as Promise<Memory[]>,
-    enabled: settings?.enabled ?? true,
+    enabled: (settings as { enabled?: boolean } | undefined)?.enabled ?? true,
   });
 
   const toggleMut = useMutation({
@@ -107,8 +107,8 @@ export function MemoryPanel() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const usedCount = memories.length;
-  const limit = settings?.limit ?? 10;
+  const usedCount = (memories as Memory[]).length;
+  const limit = (settings as { limit?: number } | undefined)?.limit ?? 10;
   const atLimit = usedCount >= limit;
 
   return (
@@ -129,17 +129,17 @@ export function MemoryPanel() {
             </div>
           </div>
           <Switch
-            checked={settings?.enabled ?? true}
+            checked={(settings as { enabled?: boolean } | undefined)?.enabled ?? true}
             onCheckedChange={(v) => toggleMut.mutate(v)}
           />
         </div>
 
-        {settings?.enabled && (
+        {(settings as { enabled?: boolean } | undefined)?.enabled && (
           <>
             {/* Usage */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="size-3.5" />
-              {usedCount} / {limit} memories used ({settings?.plan ?? "free"} plan)
+              {usedCount} / {limit} memories used ({(settings as { plan?: string } | undefined)?.plan ?? "free"} plan)
             </div>
 
             {/* Add memory */}
