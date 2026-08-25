@@ -132,7 +132,7 @@ export const Route = createFileRoute("/api/chat")({
           const { data: profile, error: profileErr } = await supabase
             .from("profiles")
             .select(
-              "plan, questions_used, usage_reset_at, learning_mode, coding_style, response_length, creativity_level",
+              "plan, questions_used, usage_reset_at, learning_mode, coding_style, response_length, creativity_level, memory_enabled",
             )
             .eq("id", userId)
             .maybeSingle();
@@ -319,6 +319,29 @@ export const Route = createFileRoute("/api/chat")({
             creativityLevel !== "balanced"
           ) {
             systemPrompt += `\n\nUser preferences: response length "${responseLength}", coding style "${codingStyle}", creativity "${creativityLevel}". Adjust explanations and any code you write to match.`;
+          }
+
+          // ===== Memory injection (Feature: User Memory System) =====
+          // Long-term facts/preferences stored separately from conversation
+          // history. Injected into system prompt to personalize responses.
+          // Only active memories, max 20 most recent, skipped if disabled.
+          const memoryEnabled = (profile as Record<string, unknown>)?.memory_enabled ?? true;
+          if (memoryEnabled) {
+            try {
+              const { data: memories } = await supabase
+                .from("user_memories")
+                .select("content")
+                .eq("user_id", userId)
+                .eq("is_active", true)
+                .order("updated_at", { ascending: false })
+                .limit(20);
+              if (memories && memories.length > 0) {
+                const memoryBlock = memories.map((m) => `- ${m.content}`).join("\n");
+                systemPrompt += `\n\n--- USER MEMORIES ---\nThe user has shared the following facts and preferences about themselves. Use this context to personalize your responses naturally — acknowledge relevant memories when they come up, but don't force-mention them.\n${memoryBlock}`;
+              }
+            } catch (e) {
+              console.warn("Memory fetch failed, continuing without memories", e);
+            }
           }
 
           const queryText =

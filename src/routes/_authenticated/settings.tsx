@@ -48,6 +48,7 @@ import {
 import { useTheme } from "@/lib/theme";
 import { ModelSettingsPanel } from "@/components/ModelSettingsPanel";
 import { CodingPreferencesPanel } from "@/components/CodingPreferencesPanel";
+import { MemoryPanel } from "@/components/MemoryPanel";
 import { useAuthAccount } from "@/hooks/use-auth-account";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -271,6 +272,8 @@ function SettingsPage() {
           <ModelSettingsPanel />
 
           <CodingPreferencesPanel />
+
+          <MemoryPanel />
 
           <Section icon={<Trash2 className="size-4" />} title="Danger zone" danger>
             <Row
