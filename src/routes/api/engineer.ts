@@ -73,6 +73,15 @@ export const Route = createFileRoute("/api/engineer")({
           }
           const userId = claimsData.claims.sub;
 
+          // Guard: reject oversized request bodies (512KB limit)
+          const contentLength = Number(request.headers.get("content-length") ?? 0);
+          if (contentLength > 524_288) {
+            return new Response(
+              JSON.stringify({ error: "payload_too_large", message: "Request body too large" }),
+              { status: 413, headers: { "Content-Type": "application/json" } },
+            );
+          }
+
           // experimental_useObject posts `{ prompt: string }` by default.
           const body = (await request.json()) as { prompt?: string };
           const prompt = (body.prompt ?? "").trim();
@@ -207,11 +216,12 @@ export const Route = createFileRoute("/api/engineer")({
             // honor JSON schemas at all. Note: Google retired gemini-2.5-flash
             // for NEW API keys; gemini-3.6-flash is the supported generation.
             const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY ?? "") ?? "";
+            const geminiModelId = cleanModelId(process.env.GEMINI_ENGINEER_MODEL ?? "gemini-3.6-flash");
             if (geminiKey) {
               candidates.push({
                 label: "gemini",
-                modelId: "gemini-3.6-flash",
-                model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-3.6-flash"),
+                modelId: geminiModelId,
+                model: createGoogleGenerativeAI({ apiKey: geminiKey })(geminiModelId),
               });
             }
           } else {
@@ -359,8 +369,6 @@ export const Route = createFileRoute("/api/engineer")({
                 error: "engineer_unavailable",
                 message:
                   "Zeus AI's engineering engine is temporarily unavailable. Please try again in a few minutes.",
-                // Temporary diagnostics — provider error strings only, no secrets.
-                attempts: attemptErrors,
               }),
               { status: 503, headers: { "Content-Type": "application/json" } },
             );
@@ -399,8 +407,7 @@ export const Route = createFileRoute("/api/engineer")({
           });
         } catch (error) {
           console.error("Engineer API error", error);
-          const message = error instanceof Error ? error.message : "An unexpected error occurred";
-          return new Response(JSON.stringify({ error: "server_error", message }), {
+          return new Response(JSON.stringify({ error: "server_error", message: "An unexpected error occurred. Please try again." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });

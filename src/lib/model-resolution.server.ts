@@ -27,7 +27,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function resolveActiveModel(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ provider: ProviderId; modelId: string; apiKey: string | null; isByok: boolean }> {
+): Promise<{ provider: ProviderId; modelId: string; apiKey: string | null; isByok: boolean; overridden?: boolean }> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("active_model_provider, active_model_id")
@@ -60,6 +60,9 @@ export async function resolveActiveModel(
       modelId: process.env.OXALPHA_MODEL || "stealth/ox-alpha",
       apiKey: oxAlphaKey,
       isByok: false,
+      // Signal when the user's chosen provider differs from what's actually
+      // being used so callers can surface a helpful message.
+      overridden: provider !== "oxalpha",
     };
   }
   if (provider === "gemini") {

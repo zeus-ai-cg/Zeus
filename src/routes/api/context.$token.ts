@@ -59,8 +59,8 @@ export const Route = createFileRoute("/api/context/$token")({
             },
           });
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Unexpected error";
-          return new Response(`Error loading project context: ${message}`, {
+          console.error("Context token error", error);
+          return new Response("Error loading project context. Please try again later.", {
             status: 500,
             headers: { "Content-Type": "text/plain; charset=utf-8" },
           });

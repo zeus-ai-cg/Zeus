@@ -89,9 +89,18 @@ export const Route = createFileRoute("/api/chat")({
           }
           const userId = claimsData.claims.sub;
 
+          // Guard: reject oversized request bodies (1MB limit)
+          const contentLength = Number(request.headers.get("content-length") ?? 0);
+          if (contentLength > 1_048_576) {
+            return new Response(
+              JSON.stringify({ error: "payload_too_large", message: "Request body too large" }),
+              { status: 413, headers: { "Content-Type": "application/json" } },
+            );
+          }
+
           const body = (await request.json()) as { messages: UIMessage[]; threadId?: string };
-          const messages = body.messages ?? [];
-          const threadId = body.threadId;
+          const messages = Array.isArray(body.messages) ? body.messages : [];
+          const threadId = typeof body.threadId === "string" ? body.threadId : "";
           if (!threadId)
             return new Response(
               JSON.stringify({ error: "missing_thread_id", message: "Missing threadId" }),
@@ -444,14 +453,13 @@ export const Route = createFileRoute("/api/chat")({
               if (message.includes("429"))
                 return "Rate limit reached. Please slow down and try again shortly.";
               if (message.includes("402"))
-                return "Gemini API credits exhausted. Please check your Google AI billing settings.";
-              return message;
+                return "API credits exhausted. Please check your billing settings or try a different model.";
+              return "An error occurred while generating a response. Please try again.";
             },
           });
         } catch (error) {
           console.error("Chat API error", error);
-          const message = error instanceof Error ? error.message : "An unexpected error occurred";
-          return new Response(JSON.stringify({ error: "server_error", message }), {
+          return new Response(JSON.stringify({ error: "server_error", message: "An unexpected error occurred. Please try again." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });

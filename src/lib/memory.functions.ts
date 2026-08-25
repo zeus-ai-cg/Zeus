@@ -81,9 +81,10 @@ export const createMemory = createServerFn({ method: "POST" })
       throw new Error(`Memory limit reached (${limit} for ${plan} plan). Delete some memories first.`);
     }
 
-    // Reject secrets/passwords/API keys
+    // Reject secrets/passwords/API keys — label-based AND raw credential patterns
     const secretPattern = /(?:password|secret|api[_-]?key|token|credential)\s*[:=]/i;
-    if (secretPattern.test(data.content)) {
+    const rawCredentialPattern = /\b(sk-[a-zA-Z0-9]{20,}|eyJ[a-zA-Z0-9_-]{20,}|ghp_[a-zA-Z0-9]{20,}|gho_[a-zA-Z0-9]{20,}|xoxb-[a-zA-Z0-9-]+|AKIA[A-Z0-9]{16}|AIza[a-zA-Z0-9_-]{20,}|sb-[a-z0-9]{20,})\b/;
+    if (secretPattern.test(data.content) || rawCredentialPattern.test(data.content)) {
       throw new Error("Cannot store passwords, API keys, or secrets as memories.");
     }
 

@@ -17,7 +17,7 @@
     "desktop:icons": "node scripts/generate-icons.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "tsx scripts/test-billing.mjs"
+    "test": "npx tsx scripts/test-billing.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.8",

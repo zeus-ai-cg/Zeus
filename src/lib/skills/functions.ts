@@ -64,7 +64,6 @@ export const toggleBuiltinSkill = createServerFn({ method: "POST" })
 
     // Plan limits
     const maxBuiltin = plan === "free" ? 3 : 8;
-    const maxCustom = plan === "free" ? 0 : plan === "pro" ? 3 : 10;
 
     let updated: string[];
     if (data.enabled) {
@@ -187,8 +186,9 @@ export async function resolveActiveSkillInstructions(
   const lastMsg = userMessage.toLowerCase();
 
   const relevant = activeBuiltin.filter((s) => {
-    const keywords = new RegExp(s.triggers, "i");
-    return keywords.test(lastMsg);
+    // Split triggers on | and check for substring match (safe, no ReDoS risk)
+    const keywords = s.triggers.split("|").map((k) => k.trim().toLowerCase());
+    return keywords.some((kw) => lastMsg.includes(kw));
   });
 
   // Fetch active custom skills for this user
@@ -209,5 +209,9 @@ export async function resolveActiveSkillInstructions(
     ...customSkills.map((s) => `[Custom: ${s.name}]\n${s.instructions}`),
   ];
 
-  return allInstructions.join("\n\n").slice(0, 2000);
+  // Cap at 2000 chars, but try to stop at a complete instruction boundary
+  const combined = allInstructions.join("\n\n");
+  if (combined.length <= 2000) return combined;
+  const lastBoundary = combined.lastIndexOf("\n\n", 2000);
+  return lastBoundary > 0 ? combined.slice(0, lastBoundary) : combined.slice(0, 2000);
 }
