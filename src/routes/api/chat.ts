@@ -19,6 +19,7 @@ import { logCredits } from "@/lib/credits.functions";
 import { FLAT_CREDIT_COSTS } from "@/lib/credits.schema";
 import { normalizePlan } from "@/lib/plans";
 import { detectPowerFeature } from "@/lib/power-features";
+import { resolveActiveSkillInstructions } from "@/lib/skills/functions";
 
 const isValidTimestamp = (value: unknown): value is string => {
   if (typeof value !== "string") return false;
@@ -374,6 +375,23 @@ export const Route = createFileRoute("/api/chat")({
               // take down chat for the thread it's attached to.
               console.error("project context build failed", e);
             }
+          }
+
+          // ===== Skills injection (Feature: Skill System) =====
+          // Matches user message against builtin + custom skill keywords,
+          // injects relevant skill instructions into system prompt.
+          // Max 2000 chars to avoid excessive prompt bloat.
+          try {
+            const skillInstructions = await resolveActiveSkillInstructions(
+              supabase,
+              userId,
+              queryText,
+            );
+            if (skillInstructions) {
+              systemPrompt += `\n\n--- ACTIVE SKILL INSTRUCTIONS ---\nThe following skill instructions are active for this user. Follow them as applicable to the user's request:\n${skillInstructions}`;
+            }
+          } catch (e) {
+            console.warn("Skill resolution failed, continuing without skills", e);
           }
 
           const providerInfo = getProvider(modelResolution.provider);
