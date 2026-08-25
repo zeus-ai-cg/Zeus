@@ -64,6 +64,7 @@ import { CreditsBadge } from "@/components/CreditsBadge";
 import { detectContinuationIntent } from "@/lib/continue.schema";
 import { SmartContinuePanel } from "@/components/SmartContinuePanel";
 import { detectPowerFeature } from "@/lib/power-features";
+import { ResponseActions } from "@/components/ResponseActions";
 
 type Props = {
   threadId: string;
@@ -850,7 +851,12 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
           ) : (
             <div className="space-y-6">
               {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  isStreaming={status === "streaming" && m.id === messages[messages.length - 1]?.id}
+                  onAction={(prompt) => sendMessage({ text: prompt })}
+                />
               ))}
               {status === "submitted" && (
                 <div className="flex gap-3">
@@ -1132,7 +1138,15 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
   );
 }
 
-function MessageBubble({ message }: { message: UIMessage }) {
+function MessageBubble({
+  message,
+  isStreaming,
+  onAction,
+}: {
+  message: UIMessage;
+  isStreaming?: boolean;
+  onAction?: (prompt: string) => void;
+}) {
   const text = message.parts
     .map((p) => (p.type === "text" ? (p as { text: string }).text : ""))
     .join("");
@@ -1199,6 +1213,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
             <Copy className="size-3" /> Copy
           </button>
         )}
+        <ResponseActions text={text} isStreaming={isStreaming} onAction={onAction} />
       </div>
     </div>
   );
