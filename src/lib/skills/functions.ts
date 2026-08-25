@@ -19,6 +19,7 @@ async function restFetch(url: string, token: string, opts: RequestInit = {}): Pr
   return fetch(url, {
     ...opts,
     headers: {
+      apikey: process.env.SUPABASE_PUBLISHABLE_KEY!,
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...opts.headers,

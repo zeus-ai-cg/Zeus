@@ -34,6 +34,7 @@ async function restQuery(
   return fetch(url, {
     ...opts,
     headers: {
+      apikey: process.env.SUPABASE_PUBLISHABLE_KEY!,
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...opts.headers,
