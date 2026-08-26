@@ -127,12 +127,28 @@ export const Route = createFileRoute("/api/chat")({
               { status: 404, headers: { "Content-Type": "application/json" } },
             );
 
-          // ===== Multi-model resolution (Phase 4: BYOK) =====
-          // Determines which provider/model this user has active and whether
-          // they've supplied their own API key for it. BYOK requests bypass
-          // Zeus AI's own usage quota below since they aren't costing the
-          // platform anything.
-          const modelResolution = await resolveActiveModel(supabase, userId);
+          // ===== Parallel data fetch =====
+          // All independent DB queries run concurrently to minimize latency
+          // before streaming starts. Model resolution, profile, and usage
+          // RPC are fully independent after userId is known.
+          const lastUser = [...messages].reverse().find((m) => m.role === "user");
+          const queryText =
+            lastUser?.parts
+              .map((p) => ("text" in p ? (p as { text: string }).text : ""))
+              .join(" ") ?? "";
+
+          const [modelResolution, profileResult, usageResult] = await Promise.all([
+            resolveActiveModel(supabase, userId),
+            supabase
+              .from("profiles")
+              .select(
+                "plan, questions_used, usage_reset_at, learning_mode, coding_style, response_length, creativity_level, memory_enabled",
+              )
+              .eq("id", userId)
+              .maybeSingle(),
+            supabase.rpc("get_current_usage", { p_user_id: userId }).maybeSingle(),
+          ]);
+
           if (!modelResolution.apiKey) {
             const providerLabel =
               getProvider(modelResolution.provider)?.label ?? modelResolution.provider;
@@ -145,15 +161,7 @@ export const Route = createFileRoute("/api/chat")({
             );
           }
 
-          // ===== Plan + usage gating =====
-          // Skipped entirely for BYOK requests — see note above.
-          const { data: profile, error: profileErr } = await supabase
-            .from("profiles")
-            .select(
-              "plan, questions_used, usage_reset_at, learning_mode, coding_style, response_length, creativity_level, memory_enabled",
-            )
-            .eq("id", userId)
-            .maybeSingle();
+          const { data: profile, error: profileErr } = profileResult;
           if (profileErr) throw profileErr;
 
           const plan = profile?.plan ?? "free";
@@ -167,19 +175,11 @@ export const Route = createFileRoute("/api/chat")({
             (profile as { pro_usage_reset_at?: string })?.pro_usage_reset_at,
           );
 
-          // Rolling reset for both the free 12h window and the Pro 30-day Fair
-          // Usage window, done in one atomic call. `profiles.plan`,
-          // `questions_used`, `pro_requests_used`, etc. are protected against
-          // direct client/user-JWT writes (see
-          // supabase/migrations/20260725120000_lock_down_profile_privileges.sql),
-          // so this SECURITY DEFINER RPC is the only way to apply a reset.
+          // Merge rolling usage reset from the SECURITY DEFINER RPC.
           if (!modelResolution.isByok) {
-            const { data: usageRow, error: usageErr } = await supabase
-              .rpc("get_current_usage", { p_user_id: userId })
-              .maybeSingle();
-            if (usageErr) throw usageErr;
-            if (usageRow) {
-              const usage = usageRow as Record<string, number | string | null>;
+            if (usageResult.error) throw usageResult.error;
+            if (usageResult.data) {
+              const usage = usageResult.data as Record<string, number | string | null>;
               questions_used = Number(usage.questions_used ?? questions_used);
               usage_reset_at = normalizeTimestamp(usage.usage_reset_at ?? usage_reset_at);
               pro_requests_used = Number(usage.pro_requests_used ?? pro_requests_used);
@@ -189,6 +189,7 @@ export const Route = createFileRoute("/api/chat")({
             }
           }
 
+          // ===== Plan + usage gating =====
           if (
             !modelResolution.isByok &&
             planTier === "free" &&
@@ -207,14 +208,6 @@ export const Route = createFileRoute("/api/chat")({
             );
           }
 
-          // ===== Pro Fair Usage Policy =====
-          // Pro is "very high limits", not literally unlimited — this stops a
-          // single account from hammering the Gemini API with tens of
-          // thousands of scripted requests. Resets automatically every
-          // PRO_RESET_DAYS days (applied above via get_current_usage); limits
-          // live in src/lib/achievements.ts. Zeus Ultimate (Feature 7) is
-          // deliberately exempt — "No Fair Usage Policy" is one of its
-          // selling points — so this only runs for planTier === "pro".
           if (planTier === "pro" && !modelResolution.isByok) {
             if (pro_requests_used >= PRO_MONTHLY_REQUEST_LIMIT) {
               const resetAt = new Date(
@@ -231,92 +224,23 @@ export const Route = createFileRoute("/api/chat")({
             }
           }
 
-          const lastUser = [...messages].reverse().find((m) => m.role === "user");
-          if (lastUser) {
-            const { error: insertErr } = await supabase.from("messages").insert({
-              thread_id: threadId,
-              user_id: userId,
-              role: "user",
-              parts: lastUser.parts as unknown as object,
-            });
-            if (insertErr) throw insertErr;
-
-            if (thread.title === "New conversation") {
-              const text =
-                lastUser.parts
-                  .map((p) => ("text" in p ? (p as { text: string }).text : ""))
-                  .join(" ")
-                  .trim()
-                  .slice(0, 60) || "New conversation";
-              const { error: titleErr } = await supabase
-                .from("threads")
-                .update({ title: text })
-                .eq("id", threadId);
-              if (titleErr) throw titleErr;
-            } else {
-              const { error: updateErr } = await supabase
-                .from("threads")
-                .update({ updated_at: new Date().toISOString() })
-                .eq("id", threadId);
-              if (updateErr) throw updateErr;
-            }
-
-            // Atomically increment usage (free-tier questions_used, or Pro's
-            // pro_requests_used) via a single-statement Postgres UPDATE (see
-            // supabase/migrations/20260706090000_atomic_usage_increment.sql).
-            // If this fails, abort so the prompt cannot complete without a
-            // reliable counter increment. Skipped for BYOK requests — those
-            // don't draw against Zeus AI's own quota.
-            if (!modelResolution.isByok) {
-              const { data: incrementData, error: incrementError } = await supabase.rpc(
-                "increment_usage",
-                { p_user_id: userId },
-              );
-              if (incrementError) {
-                // No direct-update fallback here on purpose: profiles.questions_used
-                // / pro_requests_used are now protected against writes from the
-                // authenticated role (see
-                // supabase/migrations/20260725120000_lock_down_profile_privileges.sql),
-                // so a direct .update() would silently no-op rather than actually
-                // record usage. Fail loudly instead — a missing increment_usage
-                // function means the migrations are out of date and need to be run.
-                throw new Error(incrementError.message);
-              } else if (
-                !incrementData ||
-                (Array.isArray(incrementData)
-                  ? incrementData.length === 0
-                  : Object.keys(incrementData).length === 0)
-              ) {
-                throw new Error("Usage counter update failed");
-              }
-            }
-
-            const { error: activeDateErr } = await supabase
-              .from("profiles")
-              .update({ last_active_date: new Date().toISOString().slice(0, 10) })
-              .eq("id", userId);
-            if (activeDateErr) throw activeDateErr;
-
-            // Zeus Credits (Feature 6) — informational usage ledger, logged
-            // best-effort. Does not gate access; profiles.questions_used /
-            // pro_requests_used above is still the real quota. BYOK requests
-            // still get logged here since the user is still *using* Zeus
-            // AI's Engineer tooling, even though it doesn't draw against the
-            // platform's own model quota.
-            try {
-              const isDebugMode = (profile?.learning_mode ?? "beginner") === "debug";
-              const creditCost = isDebugMode
-                ? FLAT_CREDIT_COSTS.chat_debug
-                : FLAT_CREDIT_COSTS.chat_message;
-              await logCredits(
-                supabase,
-                userId,
-                isDebugMode ? "chat_debug" : "chat_message",
-                creditCost,
-                { threadId },
-              );
-            } catch (error) {
-              console.warn("Failed to log credits for chat message", error);
+          // ===== Usage increment (blocking) =====
+          // Must complete before streaming to prevent race-condition quota
+          // bypass. Skipped for BYOK — those don't draw Zeus AI's quota.
+          if (!modelResolution.isByok) {
+            const { data: incrementData, error: incrementError } = await supabase.rpc(
+              "increment_usage",
+              { p_user_id: userId },
+            );
+            if (incrementError) {
+              throw new Error(incrementError.message);
+            } else if (
+              !incrementData ||
+              (Array.isArray(incrementData)
+                ? incrementData.length === 0
+                : Object.keys(incrementData).length === 0)
+            ) {
+              throw new Error("Usage counter update failed");
             }
           }
 
@@ -339,33 +263,36 @@ export const Route = createFileRoute("/api/chat")({
             systemPrompt += `\n\nUser preferences: response length "${responseLength}", coding style "${codingStyle}", creativity "${creativityLevel}". Adjust explanations and any code you write to match.`;
           }
 
-          // ===== Memory injection (Feature: User Memory System) =====
-          // Long-term facts/preferences stored separately from conversation
-          // history. Injected into system prompt to personalize responses.
-          // Only active memories, max 20 most recent, skipped if disabled.
+          // ===== Parallel: memory + project context + skills =====
+          // All three are independent and run concurrently to avoid
+          // sequential ~100ms round-trips before streaming.
           const memoryEnabled = (profile as Record<string, unknown>)?.memory_enabled ?? true;
-          if (memoryEnabled) {
-            try {
-              const { data: memories } = await supabase
-                .from("user_memories")
-                .select("content")
-                .eq("user_id", userId)
-                .eq("is_active", true)
-                .order("updated_at", { ascending: false })
-                .limit(20);
-              if (memories && memories.length > 0) {
-                const memoryBlock = memories.map((m) => `- ${m.content}`).join("\n");
-                systemPrompt += `\n\n--- USER MEMORIES ---\nThe user has shared the following facts and preferences about themselves. Use this context to personalize your responses naturally — acknowledge relevant memories when they come up, but don't force-mention them.\n${memoryBlock}`;
-              }
-            } catch (e) {
-              console.warn("Memory fetch failed, continuing without memories", e);
-            }
-          }
-
-          const queryText =
-            lastUser?.parts
-              .map((p) => ("text" in p ? (p as { text: string }).text : ""))
-              .join(" ") ?? "";
+          const [memoriesResult, projectContext, skillInstructions] = await Promise.all([
+            memoryEnabled
+              ? supabase
+                  .from("user_memories")
+                  .select("content")
+                  .eq("user_id", userId)
+                  .eq("is_active", true)
+                  .order("updated_at", { ascending: false })
+                  .limit(20)
+                  .then(({ data }) => data)
+              : Promise.resolve(null),
+            thread.workspace_project_id
+              ? buildProjectContextBundle(
+                  supabase,
+                  thread.workspace_project_id,
+                  queryText,
+                ).catch((e) => {
+                  console.error("project context build failed", e);
+                  return null;
+                })
+              : Promise.resolve(null),
+            resolveActiveSkillInstructions(supabase, userId, queryText).catch((e) => {
+              console.warn("Skill resolution failed, continuing without skills", e);
+              return null;
+            }),
+          ]);
 
           // Feature 11 — Hidden Power Features. Deliberately not advertised
           // anywhere in the UI beyond a small "detected" chip on the
@@ -377,38 +304,17 @@ export const Route = createFileRoute("/api/chat")({
             systemPrompt += `\n\n---\n${powerFeature.instructions}`;
           }
 
-          if (thread.workspace_project_id) {
-            try {
-              const projectContext = await buildProjectContextBundle(
-                supabase,
-                thread.workspace_project_id,
-                queryText,
-              );
-              if (projectContext) {
-                systemPrompt += `\n\n---\nPROJECT-AWARE MODE\n\n${projectContext}`;
-              }
-            } catch (e) {
-              // Fail open: a broken/deleted project's context should never
-              // take down chat for the thread it's attached to.
-              console.error("project context build failed", e);
-            }
+          if (memoriesResult && memoriesResult.length > 0) {
+            const memoryBlock = memoriesResult.map((m) => `- ${m.content}`).join("\n");
+            systemPrompt += `\n\n--- USER MEMORIES ---\nThe user has shared the following facts and preferences about themselves. Use this context to personalize your responses naturally — acknowledge relevant memories when they come up, but don't force-mention them.\n${memoryBlock}`;
           }
 
-          // ===== Skills injection (Feature: Skill System) =====
-          // Matches user message against builtin + custom skill keywords,
-          // injects relevant skill instructions into system prompt.
-          // Max 2000 chars to avoid excessive prompt bloat.
-          try {
-            const skillInstructions = await resolveActiveSkillInstructions(
-              supabase,
-              userId,
-              queryText,
-            );
-            if (skillInstructions) {
-              systemPrompt += `\n\n--- ACTIVE SKILL INSTRUCTIONS ---\nThe following skill instructions are active for this user. Follow them as applicable to the user's request:\n${skillInstructions}`;
-            }
-          } catch (e) {
-            console.warn("Skill resolution failed, continuing without skills", e);
+          if (projectContext) {
+            systemPrompt += `\n\n---\nPROJECT-AWARE MODE\n\n${projectContext}`;
+          }
+
+          if (skillInstructions) {
+            systemPrompt += `\n\n--- ACTIVE SKILL INSTRUCTIONS ---\nThe following skill instructions are active for this user. Follow them as applicable to the user's request:\n${skillInstructions}`;
           }
 
           const providerInfo = getProvider(modelResolution.provider);
@@ -440,6 +346,34 @@ export const Route = createFileRoute("/api/chat")({
             originalMessages: messages,
             onFinish: async ({ responseMessage }) => {
               try {
+                // Persist user message (deferred from pre-stream to reduce latency).
+                if (lastUser) {
+                  await supabase.from("messages").insert({
+                    thread_id: threadId,
+                    user_id: userId,
+                    role: "user",
+                    parts: lastUser.parts as unknown as object,
+                  });
+                  // Auto-title on first message; touch updated_at otherwise.
+                  if (thread.title === "New conversation") {
+                    const text =
+                      lastUser.parts
+                        .map((p) => ("text" in p ? (p as { text: string }).text : ""))
+                        .join(" ")
+                        .trim()
+                        .slice(0, 60) || "New conversation";
+                    await supabase
+                      .from("threads")
+                      .update({ title: text })
+                      .eq("id", threadId);
+                  } else {
+                    await supabase
+                      .from("threads")
+                      .update({ updated_at: new Date().toISOString() })
+                      .eq("id", threadId);
+                  }
+                }
+                // Persist assistant response.
                 await supabase.from("messages").insert({
                   thread_id: threadId,
                   user_id: userId,
@@ -450,6 +384,26 @@ export const Route = createFileRoute("/api/chat")({
                   .from("threads")
                   .update({ updated_at: new Date().toISOString() })
                   .eq("id", threadId);
+                // Bookkeeping: last active date + credit ledger (best-effort).
+                await supabase
+                  .from("profiles")
+                  .update({ last_active_date: new Date().toISOString().slice(0, 10) })
+                  .eq("id", userId);
+                try {
+                  const isDebugMode = (profile?.learning_mode ?? "beginner") === "debug";
+                  const creditCost = isDebugMode
+                    ? FLAT_CREDIT_COSTS.chat_debug
+                    : FLAT_CREDIT_COSTS.chat_message;
+                  await logCredits(
+                    supabase,
+                    userId,
+                    isDebugMode ? "chat_debug" : "chat_message",
+                    creditCost,
+                    { threadId },
+                  );
+                } catch (error) {
+                  console.warn("Failed to log credits for chat message", error);
+                }
               } catch (e) {
                 console.error("persist assistant", e);
               }

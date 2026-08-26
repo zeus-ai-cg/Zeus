@@ -609,7 +609,11 @@ function isAppUrl(url) {
 function isTrustedSender(event) {
   if (!mainWindow || event.sender !== mainWindow.webContents) return false;
   try {
+    // senderFrame?.url may point to the preload script (file:///...) in
+    // packaged builds, which is expected and safe. The sender identity
+    // check above already guarantees the IPC comes from our own window.
     const frameUrl = event.senderFrame?.url ?? "";
+    if (!frameUrl || frameUrl.startsWith("file:")) return true;
     return isAppUrl(frameUrl);
   } catch {
     return false;

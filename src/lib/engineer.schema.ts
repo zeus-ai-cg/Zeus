@@ -162,7 +162,7 @@ const BUILD_VERB =
 
 /** Nouns that imply a WHOLE product/project, not a snippet inside one. */
 const PROJECT_NOUNS =
-  /\b(app|application|web ?app|website|web ?site|saas|platform|dashboard|crm|erp|admin panel|mvp|startup product|social network|marketplace|landing page|portfolio website|blog website|e-?commerce site|online store|game|mobile app|android app|ios app|discord bot|telegram bot|slack bot|twitter bot|chrome extension|vs ?code extension|browser extension|wordpress plugin|full[ -]?stack (app|project|site)|rest api|graphql api|backend api)\b/i;
+  /\b(app|application|web ?app|website|web ?site|web ?page|webpage|saas|platform|dashboard|crm|erp|admin panel|mvp|startup product|social network|marketplace|landing page|portfolio website|blog website|e-?commerce site|online store|game|mobile app|android app|ios app|discord bot|telegram bot|slack bot|twitter bot|chrome extension|vs ?code extension|browser extension|wordpress plugin|full[ -]?stack (app|project|site)|rest api|graphql api|backend api)\b/i;
 
 /** Phrases that make "build from scratch" explicit even without a noun above. */
 const SCRATCH_SIGNALS =
