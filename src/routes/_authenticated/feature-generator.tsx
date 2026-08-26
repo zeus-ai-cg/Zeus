@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageShell";
@@ -33,6 +33,7 @@ export const Route = createFileRoute("/_authenticated/feature-generator")({
 });
 
 function FeatureGeneratorPage() {
+  const qc = useQueryClient();
   const [projectId, setProjectId] = useState<string | null>(null);
   const [activeFeature, setActiveFeature] = useState<FeatureDefinition | null>(null);
   const [modification, setModification] = useState<Modification | null>(null);
@@ -52,7 +53,10 @@ function FeatureGeneratorPage() {
       setActiveFeature(feature);
       setModification(null);
     },
-    onSuccess: (mod) => setModification(mod as unknown as Modification),
+    onSuccess: (mod) => {
+      setModification(mod as unknown as Modification);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
     onError: (e: Error) => toast.error(e.message || "Couldn't generate that feature."),
   });
 

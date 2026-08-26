@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -79,6 +79,7 @@ export function EngineerModePanel({ prompt, onClose, onSaved }: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const startedAt = useRef<number>(Date.now());
   const startedRef = useRef(false);
+  const qc = useQueryClient();
 
   const estimatedCredits = useMemo(() => estimateEngineerCredits(prompt), [prompt]);
 
@@ -131,6 +132,16 @@ export function EngineerModePanel({ prompt, onClose, onSaved }: Props) {
   const currentFile = files.length > 0 ? files[files.length - 1]?.path : undefined;
   const done = !isLoading && !!partial?.devNotes && progress.percent >= 100;
   const failed = !!error;
+
+  // Refresh the shared ["me"] query whenever the stream completes, fails,
+  // or the panel closes so the sidebar/header shows the updated
+  // questions_used / pro_requests_used count without requiring a page nav.
+  useEffect(() => {
+    if (done || failed) qc.invalidateQueries({ queryKey: ["me"] });
+  }, [done, failed, qc]);
+  useEffect(() => {
+    return () => { qc.invalidateQueries({ queryKey: ["me"] }); };
+  }, [qc]);
 
   const elapsedSec = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
   const estimateTotalSec =

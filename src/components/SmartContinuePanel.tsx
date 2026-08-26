@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,15 @@ type Props = {
 export function SmartContinuePanel({ projectId, projectName, instructions, onClose }: Props) {
   const [modification, setModification] = useState<Modification | null>(null);
   const startedRef = useRef(false);
+  const qc = useQueryClient();
 
   const proposeFn = useServerFn(proposeProjectModification);
   const proposeMut = useMutation({
     mutationFn: () => proposeFn({ data: { projectId, instructions } }),
-    onSuccess: (mod) => setModification(mod as unknown as Modification),
+    onSuccess: (mod) => {
+      setModification(mod as unknown as Modification);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
     onError: (e: Error) => toast.error(e.message || "Couldn't modify this project."),
   });
 

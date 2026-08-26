@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export function ProjectModificationPanel({
   projectId: string;
   projectName: string;
 }) {
+  const qc = useQueryClient();
   const [instructions, setInstructions] = useState("");
   const [agentId, setAgentId] = useState<string>("code-engineer");
   const [modification, setModification] = useState<Modification | null>(null);
@@ -39,7 +40,10 @@ export function ProjectModificationPanel({
           : instructions;
       return proposeFn({ data: { projectId, instructions: finalInstructions } });
     },
-    onSuccess: (mod) => setModification(mod as unknown as Modification),
+    onSuccess: (mod) => {
+      setModification(mod as unknown as Modification);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
     onError: (e: Error) => toast.error(e.message || "Couldn't generate that change."),
   });
 

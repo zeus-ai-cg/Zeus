@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export function WorkspaceToolsPanel({
   projectId: string;
   projectName: string;
 }) {
+  const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [modification, setModification] = useState<Modification | null>(null);
   const [activeGenerator, setActiveGenerator] = useState<string | null>(null);
@@ -53,7 +54,10 @@ export function WorkspaceToolsPanel({
   const proposeFn = useServerFn(proposeProjectModification);
   const proposeMut = useMutation({
     mutationFn: (instructions: string) => proposeFn({ data: { projectId, instructions } }),
-    onSuccess: (mod) => setModification(mod as unknown as Modification),
+    onSuccess: (mod) => {
+      setModification(mod as unknown as Modification);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
     onError: (e: Error) => toast.error(e.message || "Couldn't generate that."),
   });
 

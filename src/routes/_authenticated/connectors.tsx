@@ -81,7 +81,10 @@ function ConnectorsPage() {
   const editFn = useServerFn(editProjectWithZeusAI);
   const editMut = useMutation({
     mutationFn: () => editFn({ data: { files: uploaded, instructions } }),
-    onSuccess: (res: { response: string }) => setZeusResponse(res.response),
+    onSuccess: (res: { response: string }) => {
+      setZeusResponse(res.response);
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
     onError: (e: Error) => toast.error(e.message || "Zeus AI couldn't process that request."),
   });
 
