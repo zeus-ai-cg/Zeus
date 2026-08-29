@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FeedbackRouteImport } from './routes/Feedback'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
@@ -23,6 +24,7 @@ import { Route as RefundRouteImport } from './routes/refund'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as FeedbackFeedbackIdRouteImport } from './routes/Feedback.$feedbackId'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedConnectorsRouteImport } from './routes/_authenticated/connectors'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -40,6 +42,7 @@ import { Route as AuthIndexRouteImport } from './routes/auth/index'
 import { Route as AuthDesktopRouteImport } from './routes/auth/desktop'
 import { Route as BillingCancelRouteImport } from './routes/billing.cancel'
 import { Route as BillingSuccessRouteImport } from './routes/billing.success'
+import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as AuthenticatedChatIndexRouteImport } from './routes/_authenticated/chat.index'
 import { Route as AuthenticatedChatThreadIdRouteImport } from './routes/_authenticated/chat.$threadId'
 import { Route as ApiContextTokenRouteImport } from './routes/api/context.$token'
@@ -54,6 +57,11 @@ import { Route as ApiVscodeLatestRouteImport } from './routes/api/vscode/latest'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/Feedback',
+  path: '/Feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -119,6 +127,11 @@ const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackFeedbackIdRoute = FeedbackFeedbackIdRouteImport.update({
+  id: '/$feedbackId',
+  path: '/$feedbackId',
+  getParentRoute: () => FeedbackRoute,
 } as any)
 const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
   id: '/billing',
@@ -206,6 +219,11 @@ const BillingSuccessRoute = BillingSuccessRouteImport.update({
   path: '/billing/success',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UUsernameRoute = UUsernameRouteImport.update({
+  id: '/u/$username',
+  path: '/u/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedChatIndexRoute = AuthenticatedChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
@@ -261,6 +279,7 @@ const ApiVscodeLatestRoute = ApiVscodeLatestRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
+  '/Feedback': typeof FeedbackRouteWithChildren
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
@@ -272,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/Feedback/$feedbackId': typeof FeedbackFeedbackIdRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/connectors': typeof AuthenticatedConnectorsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -288,6 +308,7 @@ export interface FileRoutesByFullPath {
   '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/u/$username': typeof UUsernameRoute
   '/auth/': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
@@ -302,6 +323,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/Feedback': typeof FeedbackRouteWithChildren
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
@@ -313,6 +335,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/Feedback/$feedbackId': typeof FeedbackFeedbackIdRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/connectors': typeof AuthenticatedConnectorsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -329,6 +352,7 @@ export interface FileRoutesByTo {
   '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/u/$username': typeof UUsernameRoute
   '/auth': typeof AuthIndexRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
@@ -346,6 +370,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
+  '/Feedback': typeof FeedbackRouteWithChildren
   '/about': typeof AboutRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
@@ -357,6 +382,7 @@ export interface FileRoutesById {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/Feedback/$feedbackId': typeof FeedbackFeedbackIdRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/connectors': typeof AuthenticatedConnectorsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -373,6 +399,7 @@ export interface FileRoutesById {
   '/auth/desktop': typeof AuthDesktopRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/success': typeof BillingSuccessRoute
+  '/u/$username': typeof UUsernameRoute
   '/auth/': typeof AuthIndexRoute
   '/_authenticated/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/context/$token': typeof ApiContextTokenRoute
@@ -390,6 +417,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/Feedback'
     | '/about'
     | '/blog'
     | '/contact'
@@ -401,6 +429,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/terms'
+    | '/Feedback/$feedbackId'
     | '/billing'
     | '/connectors'
     | '/dashboard'
@@ -417,6 +446,7 @@ export interface FileRouteTypes {
     | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/u/$username'
     | '/auth/'
     | '/chat/$threadId'
     | '/api/context/$token'
@@ -431,6 +461,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/Feedback'
     | '/about'
     | '/blog'
     | '/contact'
@@ -442,6 +473,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/terms'
+    | '/Feedback/$feedbackId'
     | '/billing'
     | '/connectors'
     | '/dashboard'
@@ -458,6 +490,7 @@ export interface FileRouteTypes {
     | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/u/$username'
     | '/auth'
     | '/chat/$threadId'
     | '/api/context/$token'
@@ -474,6 +507,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/Feedback'
     | '/about'
     | '/blog'
     | '/contact'
@@ -485,6 +519,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/terms'
+    | '/Feedback/$feedbackId'
     | '/_authenticated/billing'
     | '/_authenticated/connectors'
     | '/_authenticated/dashboard'
@@ -501,6 +536,7 @@ export interface FileRouteTypes {
     | '/auth/desktop'
     | '/billing/cancel'
     | '/billing/success'
+    | '/u/$username'
     | '/auth/'
     | '/_authenticated/chat/$threadId'
     | '/api/context/$token'
@@ -518,6 +554,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
+  FeedbackRoute: typeof FeedbackRouteWithChildren
   AboutRoute: typeof AboutRoute
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
@@ -534,6 +571,7 @@ export interface RootRouteChildren {
   ApiWebhooksRoute: typeof ApiWebhooksRoute
   BillingCancelRoute: typeof BillingCancelRoute
   BillingSuccessRoute: typeof BillingSuccessRoute
+  UUsernameRoute: typeof UUsernameRoute
   ApiContextTokenRoute: typeof ApiContextTokenRoute
   ApiDesktopLatestRoute: typeof ApiDesktopLatestRoute
   ApiDownloadDesktopRoute: typeof ApiDownloadDesktopRoute
@@ -551,6 +589,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/Feedback': {
+      id: '/Feedback'
+      path: '/Feedback'
+      fullPath: '/Feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -643,6 +688,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/Feedback/$feedbackId': {
+      id: '/Feedback/$feedbackId'
+      path: '/$feedbackId'
+      fullPath: '/Feedback/$feedbackId'
+      preLoaderRoute: typeof FeedbackFeedbackIdRouteImport
+      parentRoute: typeof FeedbackRoute
     }
     '/_authenticated/billing': {
       id: '/_authenticated/billing'
@@ -761,6 +813,13 @@ declare module '@tanstack/react-router' {
       path: '/billing/success'
       fullPath: '/billing/success'
       preLoaderRoute: typeof BillingSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username': {
+      id: '/u/$username'
+      path: '/u/$username'
+      fullPath: '/u/$username'
+      preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/chat/': {
@@ -883,10 +942,23 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
+interface FeedbackRouteChildren {
+  FeedbackFeedbackIdRoute: typeof FeedbackFeedbackIdRoute
+}
+
+const FeedbackRouteChildren: FeedbackRouteChildren = {
+  FeedbackFeedbackIdRoute: FeedbackFeedbackIdRoute,
+}
+
+const FeedbackRouteWithChildren = FeedbackRoute._addFileChildren(
+  FeedbackRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
+  FeedbackRoute: FeedbackRouteWithChildren,
   AboutRoute: AboutRoute,
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
@@ -903,6 +975,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebhooksRoute: ApiWebhooksRoute,
   BillingCancelRoute: BillingCancelRoute,
   BillingSuccessRoute: BillingSuccessRoute,
+  UUsernameRoute: UUsernameRoute,
   ApiContextTokenRoute: ApiContextTokenRoute,
   ApiDesktopLatestRoute: ApiDesktopLatestRoute,
   ApiDownloadDesktopRoute: ApiDownloadDesktopRoute,

@@ -65,6 +65,7 @@ import { detectContinuationIntent } from "@/lib/continue.schema";
 import { SmartContinuePanel } from "@/components/SmartContinuePanel";
 import { detectPowerFeature } from "@/lib/power-features";
 import { ResponseActions } from "@/components/ResponseActions";
+import { FeedbackComposer } from "@/components/feedback/FeedbackComposer";
 
 type Props = {
   threadId: string;
@@ -225,6 +226,8 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
   // ⚡ Zeus Smart Continue (Feature 5) — set to the triggering prompt to
   // modify the thread's attached project instead of a normal chat turn.
   const [continuePrompt, setContinuePrompt] = useState<string | null>(null);
+  // Feedback sharing
+  const [showFeedbackComposer, setShowFeedbackComposer] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -856,6 +859,7 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
                   message={m}
                   isStreaming={status === "streaming" && m.id === messages[messages.length - 1]?.id}
                   onAction={(prompt) => sendMessage({ text: prompt })}
+                  onShareFeedback={() => setShowFeedbackComposer(true)}
                 />
               ))}
               {status === "submitted" && (
@@ -1134,6 +1138,14 @@ export function ChatWindow({ threadId, initialMessages, initialPrompt }: Props) 
           </p>
         </form>
       </div>
+
+      {/* Feedback Composer */}
+      {showFeedbackComposer && (
+        <FeedbackComposer
+          onClose={() => setShowFeedbackComposer(false)}
+          initialThreadId={threadId}
+        />
+      )}
     </div>
   );
 }
@@ -1142,10 +1154,12 @@ function MessageBubble({
   message,
   isStreaming,
   onAction,
+  onShareFeedback,
 }: {
   message: UIMessage;
   isStreaming?: boolean;
   onAction?: (prompt: string) => void;
+  onShareFeedback?: () => void;
 }) {
   const text = message.parts
     .map((p) => (p.type === "text" ? (p as { text: string }).text : ""))
@@ -1213,7 +1227,7 @@ function MessageBubble({
             <Copy className="size-3" /> Copy
           </button>
         )}
-        <ResponseActions text={text} isStreaming={isStreaming} onAction={onAction} />
+        <ResponseActions text={text} isStreaming={isStreaming} onAction={onAction} onShareFeedback={onShareFeedback} />
       </div>
     </div>
   );

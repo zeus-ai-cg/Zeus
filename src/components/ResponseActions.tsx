@@ -6,6 +6,7 @@ import {
   Minus,
   Code2,
   Check,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -36,9 +37,10 @@ type Props = {
   text: string;
   isStreaming?: boolean;
   onAction?: (prompt: string) => void;
+  onShareFeedback?: () => void;
 };
 
-export function ResponseActions({ text, isStreaming, onAction }: Props) {
+export function ResponseActions({ text, isStreaming, onAction, onShareFeedback }: Props) {
   const [copied, setCopied] = useState(false);
 
   const hasCode = HAS_CODE_FENCES.test(text) || CODE_KEYWORDS.test(text);
@@ -101,6 +103,21 @@ export function ResponseActions({ text, isStreaming, onAction }: Props) {
           </button>
         );
       })}
+      {onShareFeedback && (
+        <button
+          type="button"
+          onClick={onShareFeedback}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors",
+            "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground",
+            "border border-transparent hover:border-border",
+          )}
+          title="Share as Feedback"
+        >
+          <MessageSquare className="size-3" />
+          <span className="hidden sm:inline">Share Feedback</span>
+        </button>
+      )}
     </div>
   );
 }

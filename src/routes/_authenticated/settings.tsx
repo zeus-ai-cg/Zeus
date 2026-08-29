@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMe, setLearningMode } from "@/lib/profile.functions";
 import { UpgradeProButton } from "@/components/UpgradeProButton";
+import { listMyFeedback, deleteFeedback } from "@/lib/feedback.functions";
 import {
   LEARNING_MODES,
   PRO_MONTHLY_REQUEST_LIMIT,
@@ -51,6 +52,8 @@ import { CodingPreferencesPanel } from "@/components/CodingPreferencesPanel";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
 import { useAuthAccount } from "@/hooks/use-auth-account";
+import { FeedbackCard } from "@/components/feedback/FeedbackCard";
+import { Star } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -72,6 +75,14 @@ function SettingsPage() {
   const [notifications, setNotifications] = useState(true);
   const [analytics, setAnalytics] = useState(true);
   const [lang, setLang] = useState("en");
+
+  // My Feedback
+  const myFeedbackFn = useServerFn(listMyFeedback);
+  const deleteFbFn = useServerFn(deleteFeedback);
+  const { data: myFeedback } = useQuery({
+    queryKey: ["my-feedback"],
+    queryFn: () => myFeedbackFn({} as any),
+  });
 
   const modeMut = useMutation({
     mutationFn: (mode: string) => updMode({ data: { mode: mode as never } }),
@@ -277,6 +288,39 @@ function SettingsPage() {
           <MemoryPanel />
 
           <SkillsPanel />
+
+          <Section icon={<Star className="size-4" />} title="My Feedback">
+            {myFeedback && myFeedback.length > 0 ? (
+              <div className="p-4 space-y-3">
+                {myFeedback.map((fb: any) => (
+                  <div key={fb.id} className="flex items-center gap-3">
+                    <FeedbackCard feedback={fb} />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={async () => {
+                        if (confirm("Delete this feedback?")) {
+                          await deleteFbFn({ data: { feedbackId: fb.id } });
+                          qc.invalidateQueries({ queryKey: ["my-feedback"] });
+                          toast.success("Feedback deleted");
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-5 text-sm text-muted-foreground">
+                You haven't submitted any feedback yet.{" "}
+                <Link to="/Feedback" className="text-primary hover:underline">
+                  Give feedback
+                </Link>
+              </div>
+            )}
+          </Section>
 
           <Section icon={<Trash2 className="size-4" />} title="Danger zone" danger>
             <Row
