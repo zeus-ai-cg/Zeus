@@ -102,6 +102,7 @@ const NAV = [
   { to: "/profile", label: "Profile", icon: UserIcon },
   { to: "/billing", label: "Billing", icon: CreditCard },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
+  { to: "/Feedback", label: "Feedback", icon: MessageSquare },
 ] as const;
 
 function ChatLayout() {

@@ -713,3 +713,92 @@ export const confirmFeedbackUpload = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============================================================================
+// ADMIN FUNCTIONS (hidden moderation — only for admin users)
+// ============================================================================
+
+const ADMIN_EMAIL = "haidersiddique0909@gmail.com";
+
+async function checkIsAdmin(supabase: AnySupabase, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.role === "admin";
+}
+
+export const adminDeleteFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (input: unknown) =>
+      z.object({ feedbackId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase as unknown as AnySupabase;
+    if (!(await checkIsAdmin(supabase, context.userId))) {
+      throw new Error("Unauthorized");
+    }
+    const { error } = await supabase
+      .from("feedback")
+      .update({ status: "deleted", visibility: "private" })
+      .eq("id", data.feedbackId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminHideFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (input: unknown) =>
+      z.object({ feedbackId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase as unknown as AnySupabase;
+    if (!(await checkIsAdmin(supabase, context.userId))) {
+      throw new Error("Unauthorized");
+    }
+    const { error } = await supabase
+      .from("feedback")
+      .update({ status: "hidden" })
+      .eq("id", data.feedbackId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminBlockUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (input: unknown) =>
+      z.object({ userId: z.string().uuid(), reason: z.string().optional() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase as unknown as AnySupabase;
+    if (!(await checkIsAdmin(supabase, context.userId))) {
+      throw new Error("Unauthorized");
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ plan: "blocked" })
+      .eq("id", data.userId);
+    if (error) throw new Error(error.message);
+
+    await supabase
+      .from("feedback")
+      .update({ status: "hidden", visibility: "private" })
+      .eq("user_id", data.userId)
+      .eq("visibility", "public");
+
+    return { ok: true };
+  });
+
+export const checkAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase as unknown as AnySupabase;
+    const isAdmin = await checkIsAdmin(supabase, context.userId);
+    const { data: user } = await supabase.auth.getUser();
+    const isAdminEmail = user?.user?.email === ADMIN_EMAIL;
+    return { isAdmin: isAdmin || isAdminEmail };
+  });

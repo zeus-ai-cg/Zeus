@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Bot, KeyRound, Loader2, Trash2, CheckCircle2 } from "lucide-react";
+import { Bot, KeyRound, Loader2, Trash2, CheckCircle2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,14 @@ export function ModelSettingsPanel() {
   });
 
   const activeProviderInfo = getProvider(activeProvider) ?? PROVIDERS[0];
-  const canUseActive = activeProvider === "gemini" || keyByProvider.has(activeProvider);
+  const canUseActive = activeProviderInfo?.builtIn || keyByProvider.has(activeProvider);
+
+  const switchToBuiltIn = () => {
+    const builtIn = PROVIDERS.find((p) => p.builtIn);
+    if (builtIn) {
+      setActiveMut.mutate({ provider: builtIn.id, modelId: builtIn.models[0].id });
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card/60 overflow-hidden">
@@ -99,10 +106,21 @@ export function ModelSettingsPanel() {
           </Select>
         </div>
         {!canUseActive && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-            Add an API key for {activeProviderInfo.label} below — chat won't work for this provider
-            until you do.
-          </p>
+          <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              You need an API key for {activeProviderInfo.label} to use this provider.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 border-amber-500/30 hover:bg-amber-500/10"
+              onClick={switchToBuiltIn}
+              disabled={setActiveMut.isPending}
+            >
+              <Zap className="size-3.5 mr-1.5" />
+              Use Zeus Built-In API instead
+            </Button>
+          </div>
         )}
       </div>
 

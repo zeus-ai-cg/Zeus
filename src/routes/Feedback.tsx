@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { listPublicFeedback, type FeedbackRow } from "@/lib/feedback.functions";
+import { listPublicFeedback, checkAdmin, type FeedbackRow } from "@/lib/feedback.functions";
 import { MarketingLayout, PageHero } from "@/components/MarketingLayout";
 import { StarRating } from "@/components/feedback/StarRating";
 import { FeedbackCard } from "@/components/feedback/FeedbackCard";
@@ -65,6 +65,13 @@ function FeedbackPage() {
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const listFn = useServerFn(listPublicFeedback);
+  const adminFn = useServerFn(checkAdmin);
+
+  const { data: adminData } = useQuery({
+    queryKey: ["admin-check"],
+    queryFn: () => adminFn().catch(() => ({ isAdmin: false })),
+  });
+  const isAdmin = adminData?.isAdmin ?? false;
 
   const { data, isFetching } = useQuery({
     queryKey: ["public-feedback", category, sort, search, page],
@@ -254,7 +261,7 @@ function FeedbackPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {allItems.map((item) => (
-              <FeedbackCard key={item.id} feedback={item} />
+              <FeedbackCard key={item.id} feedback={item} showAdminControls={isAdmin} />
             ))}
             {/* Skeleton loading */}
             {isFetching &&
