@@ -25,19 +25,57 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       throw new Error("Unauthorized: No request headers available");
     }
 
+    // Try Bearer token first (API routes / desktop app)
     const authHeader = request.headers.get("authorization");
+    let token: string | null = null;
 
-    if (!authHeader) {
-      throw new Error("Unauthorized: No authorization header provided");
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "");
     }
 
-    if (!authHeader.startsWith("Bearer ")) {
-      throw new Error("Unauthorized: Only Bearer tokens are supported");
-    }
-
-    const token = authHeader.replace("Bearer ", "");
+    // Fallback: extract Supabase session from cookies (TanStack Start server functions)
     if (!token) {
-      throw new Error("Unauthorized: No token provided");
+      const cookieHeader = request.headers.get("cookie") ?? "";
+      const cookies = Object.fromEntries(
+        cookieHeader.split(";").map((c) => {
+          const [k, ...v] = c.trim().split("=");
+          return [k, v.join("=")];
+        }),
+      );
+      // Supabase stores the session in sb-<ref>-auth-token or similar cookie
+      const authCookieKey = Object.keys(cookies).find((k) => k.includes("auth-token"));
+      if (authCookieKey) {
+        try {
+          const sessionData = JSON.parse(decodeURIComponent(cookies[authCookieKey]));
+          token = sessionData?.access_token ?? null;
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    // Last resort: try to create a Supabase client with cookies and get session
+    if (!token) {
+      const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: {
+          storage: undefined,
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+        global: {
+          headers: {
+            cookie: request.headers.get("cookie") ?? "",
+          },
+        },
+      });
+      const { data: { session } } = await supabaseAnon.auth.getSession();
+      if (session?.access_token) {
+        token = session.access_token;
+      }
+    }
+
+    if (!token) {
+      throw new Error("Unauthorized: No authorization header provided");
     }
 
     const supabase = createClient<Database>(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
