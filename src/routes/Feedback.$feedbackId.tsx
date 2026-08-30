@@ -5,6 +5,7 @@ import {
   getPublicFeedback,
   toggleFeedbackVote,
   reportFeedback,
+  checkUserVoted,
 } from "@/lib/feedback.functions";
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { StarRating } from "@/components/feedback/StarRating";
@@ -35,6 +36,7 @@ import {
   Shield,
   User,
 } from "lucide-react";
+import { timeAgo } from "@/lib/utils";
 
 export const Route = createFileRoute("/Feedback/$feedbackId")({
   head: ({ params }) => ({
@@ -51,22 +53,6 @@ export const Route = createFileRoute("/Feedback/$feedbackId")({
   component: FeedbackDetailPage,
 });
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
-}
-
 function FeedbackDetailPage() {
   const { feedbackId } = Route.useParams();
   const queryClient = useQueryClient();
@@ -77,17 +63,25 @@ function FeedbackDetailPage() {
   const getFeedbackFn = useServerFn(getPublicFeedback);
   const voteFn = useServerFn(toggleFeedbackVote);
   const reportFn = useServerFn(reportFeedback);
+  const votedFn = useServerFn(checkUserVoted);
 
   const { data: feedback, isFetching } = useQuery({
     queryKey: ["feedback-detail", feedbackId],
     queryFn: () => getFeedbackFn({ data: { feedbackId } }),
   });
 
+  const { data: votedData } = useQuery({
+    queryKey: ["feedback-voted", feedbackId],
+    queryFn: () => votedFn({ data: { feedbackId } }),
+  });
+  const hasVoted = votedData?.voted ?? false;
+
   const voteMutation = useMutation({
     mutationFn: () => voteFn({ data: { feedbackId } }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["feedback-detail", feedbackId] });
       queryClient.invalidateQueries({ queryKey: ["public-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["feedback-voted", feedbackId] });
       toast.success(result.voted ? "Marked as helpful!" : "Vote removed.");
     },
     onError: () => toast.error("Failed to vote."),
@@ -174,10 +168,12 @@ function FeedbackDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{name}</span>
-                <Badge variant="secondary" className="gap-1 text-[10px]">
-                  <Shield className="size-2.5" />
-                  Verified Zeus User
-                </Badge>
+                {name !== "Anonymous" && (
+                  <Badge variant="secondary" className="gap-1 text-[10px]">
+                    <Shield className="size-2.5" />
+                    Zeus User
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {timeAgo(fb.created_at)}
@@ -291,14 +287,14 @@ function FeedbackDetailPage() {
         {/* Actions */}
         <div className="flex items-center justify-between">
           <Button
-            variant="outline"
+            variant={hasVoted ? "default" : "outline"}
             size="sm"
-            className="gap-2"
+            className={`gap-2 ${hasVoted ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}`}
             onClick={() => voteMutation.mutate()}
             disabled={voteMutation.isPending}
           >
             <ThumbsUp className="size-4" />
-            {fb.helpful_count} Helpful
+            {fb.helpful_count} {hasVoted ? "Helpful (voted)" : "Helpful"}
           </Button>
 
           <Button

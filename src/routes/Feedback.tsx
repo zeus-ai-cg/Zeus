@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { listPublicFeedback, checkAdmin, type FeedbackRow } from "@/lib/feedback.functions";
+import { listPublicFeedback, getFeedbackStats, checkAdmin, type FeedbackRow } from "@/lib/feedback.functions";
 import { MarketingLayout, PageHero } from "@/components/MarketingLayout";
 import { StarRating } from "@/components/feedback/StarRating";
 import { FeedbackCard } from "@/components/feedback/FeedbackCard";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Loader2, MessageSquare, TrendingUp, Clock, ThumbsUp, Star } from "lucide-react";
+import { Search, Loader2, MessageSquare, TrendingUp, Clock, ThumbsUp, Star, Monitor, Code, CreditCard } from "lucide-react";
 
 export const Route = createFileRoute("/Feedback")({
   head: () => ({
@@ -42,6 +42,9 @@ const CATEGORIES = [
   { value: "engineer", label: "Engineer", icon: TrendingUp },
   { value: "memory", label: "Memory", icon: Clock },
   { value: "skills", label: "Skills", icon: Star },
+  { value: "desktop", label: "Desktop", icon: Monitor },
+  { value: "vscode", label: "VS Code", icon: Code },
+  { value: "billing", label: "Billing", icon: CreditCard },
   { value: "performance", label: "Performance", icon: TrendingUp },
   { value: "other", label: "Other", icon: MessageSquare },
 ] as const;
@@ -52,6 +55,15 @@ const SORT_OPTIONS = [
   { value: "highest", label: "Highest Rated", icon: Star },
   { value: "lowest", label: "Lowest Rated", icon: Star },
 ] as const;
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 function FeedbackPage() {
   const [showComposer, setShowComposer] = useState(false);
@@ -64,7 +76,10 @@ function FeedbackPage() {
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
 
+  const debouncedSearch = useDebounce(search, 300);
+
   const listFn = useServerFn(listPublicFeedback);
+  const statsFn = useServerFn(getFeedbackStats);
   const adminFn = useServerFn(checkAdmin);
 
   const { data: adminData } = useQuery({
@@ -73,11 +88,17 @@ function FeedbackPage() {
   });
   const isAdmin = adminData?.isAdmin ?? false;
 
+  // Server-side accurate stats
+  const { data: statsData } = useQuery({
+    queryKey: ["feedback-stats"],
+    queryFn: () => statsFn(),
+  });
+
   const { data, isFetching } = useQuery({
-    queryKey: ["public-feedback", category, sort, search, page],
+    queryKey: ["public-feedback", category, sort, debouncedSearch, page],
     queryFn: () =>
       listFn({
-        data: { page, pageSize: 12, category, sort, search },
+        data: { page, pageSize: 12, category, sort, search: debouncedSearch },
       }),
   });
 
@@ -86,7 +107,11 @@ function FeedbackPage() {
       if (page === 1) {
         setAllItems(data.items);
       } else {
-        setAllItems((prev) => [...prev, ...data.items]);
+        setAllItems((prev) => {
+          const existingIds = new Set(prev.map((i) => i.id));
+          const newItems = data.items.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
       }
       setTotal(data.total);
       setHasMore(data.items.length === 12);
@@ -128,14 +153,10 @@ function FeedbackPage() {
     return () => observer.disconnect();
   }, [hasMore, isFetching]);
 
-  // Rating distribution
-  const ratingDist = [0, 0, 0, 0, 0];
-  allItems.forEach((item) => {
-    if (item.rating >= 1 && item.rating <= 5) ratingDist[item.rating - 1]++;
-  });
-  const avgRating = allItems.length
-    ? (allItems.reduce((sum, item) => sum + item.rating, 0) / allItems.length).toFixed(1)
-    : "0.0";
+  // Use server-side stats for accurate display
+  const avgRating = statsData ? statsData.avgRating.toFixed(1) : "0.0";
+  const statsTotal = statsData ? statsData.totalCount : total;
+  const distribution = statsData?.distribution ?? [0, 0, 0, 0, 0];
 
   return (
     <MarketingLayout>
@@ -164,8 +185,8 @@ function FeedbackPage() {
         </div>
       </section>
 
-      {/* Stats bar */}
-      {allItems.length > 0 && (
+      {/* Stats bar — always shown if we have stats */}
+      {statsTotal > 0 && (
         <section className="border-b bg-muted/30">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-8 px-4 py-6 text-sm">
             <div className="flex items-center gap-2">
@@ -175,7 +196,7 @@ function FeedbackPage() {
             </div>
             <div className="flex items-center gap-2">
               <MessageSquare className="size-4 text-muted-foreground" />
-              <span className="font-semibold">{total}</span>
+              <span className="font-semibold">{statsTotal}</span>
               <span className="text-muted-foreground">reviews</span>
             </div>
             <div className="hidden items-center gap-1 sm:flex">
@@ -186,7 +207,7 @@ function FeedbackPage() {
                     <div
                       className="h-full rounded-full bg-yellow-400 transition-all"
                       style={{
-                        width: `${allItems.length ? (ratingDist[star - 1] / allItems.length) * 100 : 0}%`,
+                        width: `${statsTotal > 0 ? (distribution[star - 1] / statsTotal) * 100 : 0}%`,
                       }}
                     />
                   </div>

@@ -83,6 +83,62 @@ export interface FeedbackMessage {
 }
 
 // ============================================================================
+// PUBLIC: Get accurate rating stats (server-side, no pagination needed)
+// ============================================================================
+
+export const getFeedbackStats = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_PUBLISHABLE_KEY!,
+    ) as unknown as AnySupabase;
+
+    const { data, error } = await supabase.rpc("get_feedback_stats");
+    if (error) {
+      // Fallback: compute from feedback table directly
+      const { data: rows } = await supabase
+        .from("feedback")
+        .select("rating")
+        .eq("visibility", "public")
+        .eq("status", "published");
+      const ratings = (rows ?? []).map((r: any) => r.rating);
+      const total = ratings.length;
+      const avg = total > 0 ? ratings.reduce((a: number, b: number) => a + b, 0) / total : 0;
+      return {
+        totalCount: total,
+        avgRating: avg,
+        distribution: [1, 2, 3, 4, 5].map((r) => ratings.filter((x: number) => x === r).length),
+      };
+    }
+    const row = data as any;
+    return {
+      totalCount: Number(row.total_count),
+      avgRating: Number(row.avg_rating),
+      distribution: [Number(row.count_1), Number(row.count_2), Number(row.count_3), Number(row.count_4), Number(row.count_5)],
+    };
+  });
+
+// ============================================================================
+// AUTHENTICATED: Check if user has voted on a feedback item
+// ============================================================================
+
+export const checkUserVoted = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (input: unknown) =>
+      z.object({ feedbackId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase as unknown as AnySupabase;
+    const { data: voted } = await supabase.rpc("has_user_voted", {
+      p_feedback_id: data.feedbackId,
+      p_user_id: context.userId,
+    });
+    return { voted: Boolean(voted) };
+  });
+
+// ============================================================================
 // PUBLIC: List public feedback (infinite scroll / pagination)
 // ============================================================================
 
@@ -255,6 +311,7 @@ export const listMyFeedback = createServerFn({ method: "GET" })
         `
         id, title, body, rating, category, visibility, status,
         helpful_count, created_at, updated_at,
+        profiles(display_name, avatar_url),
         feedback_attachments(id, file_name, mime_type),
         feedback_projects(id, title),
         public_feedback_conversations(id, title, message_count)
@@ -704,11 +761,13 @@ export const confirmFeedbackUpload = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const supabase = context.supabase as unknown as AnySupabase;
 
+    // Verify the attachment exists and belongs to this user (no-op confirmation)
     const { error } = await supabase
       .from("feedback_attachments")
-      .update({ file_size: 0 })
+      .select("id")
       .eq("id", data.attachmentId)
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .single();
 
     if (error) throw new Error(error.message);
     return { ok: true };

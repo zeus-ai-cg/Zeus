@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, ThumbsUp, Folder, Shield, EyeOff, Trash2, Ban } from "lucide-react";
 import { toast } from "sonner";
+import { timeAgo } from "@/lib/utils";
 import { checkAdmin, adminDeleteFeedback, adminHideFeedback, adminBlockUser } from "@/lib/feedback.functions";
 import type { FeedbackRow } from "@/lib/feedback.functions";
 
@@ -32,22 +33,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   performance: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
   other: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
 };
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
-}
 
 export function FeedbackCard({ feedback, showAdminControls = false }: FeedbackCardProps) {
   const qc = useQueryClient();
