@@ -48,20 +48,27 @@ export async function resolveActiveModel(
     return { provider, modelId, apiKey: decryptSecret(keyRow.encrypted_key), isByok: true };
   }
 
-  // No BYOK key for the active provider. Platform-owned fallback: Ox Alpha
-  // (Tokenra gateway) first — it powers ALL Zeus AI features by default
-  // (chat, engineer mode, reviews, terminal, git tools, modifications) — then
-  // Gemini as a legacy safety net. Any other provider without a user key
-  // can't be used.
-  const oxAlphaKey = process.env.OxALPHA_API_KEY ?? process.env.OXALPHA_API_KEY ?? "";
+  // No BYOK key. Platform fallback priority:
+  // 1. Gemini (primary — powers engineer mode and chat fallback)
+  // 2. OxAlpha/OpenRouter (secondary)
+  const geminiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  if (geminiKey) {
+    const geminiModelId = (process.env.GEMINI_ENGINEER_MODEL ?? "gemini-2.5-flash").trim();
+    return {
+      provider: "gemini",
+      modelId: geminiModelId,
+      apiKey: geminiKey,
+      isByok: false,
+      overridden: provider !== "gemini",
+    };
+  }
+  const oxAlphaKey = (process.env.OxALPHA_API_KEY ?? process.env.OXALPHA_API_KEY ?? "").trim();
   if (oxAlphaKey) {
     return {
       provider: "oxalpha",
       modelId: process.env.OXALPHA_MODEL || "stealth/ox-alpha",
       apiKey: oxAlphaKey,
       isByok: false,
-      // Signal when the user's chosen provider differs from what's actually
-      // being used so callers can surface a helpful message.
       overridden: provider !== "oxalpha",
     };
   }
