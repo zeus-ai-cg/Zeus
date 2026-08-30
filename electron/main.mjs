@@ -604,20 +604,10 @@ function isAppUrl(url) {
   }
 }
 
-// IPC validation: only accept calls from our own window rendering an
-// allowed app origin.
+// IPC validation: only accept calls from our own window.
 function isTrustedSender(event) {
-  if (!mainWindow || event.sender !== mainWindow.webContents) return false;
-  try {
-    // senderFrame?.url may point to the preload script (file:///...) in
-    // packaged builds, which is expected and safe. The sender identity
-    // check above already guarantees the IPC comes from our own window.
-    const frameUrl = event.senderFrame?.url ?? "";
-    if (!frameUrl || frameUrl.startsWith("file:")) return true;
-    return isAppUrl(frameUrl);
-  } catch {
-    return false;
-  }
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  return event.sender === mainWindow.webContents;
 }
 
 /* ── app lifecycle ──────────────────────────────────────────────── */
@@ -667,8 +657,6 @@ if (!gotLock) {
     // The system browser does the Google dance; this process never renders it.
     ipcMain.handle("zeus-desktop:oauth:start-google", async (event) => {
       if (!isTrustedSender(event)) {
-        const frameUrl = (() => { try { return event.senderFrame?.url ?? "unknown"; } catch { return "error"; } })();
-        console.error("[oauth] rejected: untrusted sender. frameUrl:", frameUrl, "mainWindow:", !!mainWindow);
         return { error: "Unauthorized caller. Please restart the desktop app and try again." };
       }
       if (pendingOAuth) return { error: "A sign-in is already in progress." };
