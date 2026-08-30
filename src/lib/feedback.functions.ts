@@ -104,6 +104,8 @@ export const listPublicFeedback = createServerFn({ method: "GET" })
       process.env.SUPABASE_PUBLISHABLE_KEY!,
     ) as unknown as AnySupabase;
 
+    // First try with profiles join; if it fails (e.g. anon can't read profiles),
+    // fall back to a plain query without the join.
     let query = supabase
       .from("feedback")
       .select(
@@ -145,7 +147,37 @@ export const listPublicFeedback = createServerFn({ method: "GET" })
     const offset = (data.page - 1) * data.pageSize;
     query = query.range(offset, offset + data.pageSize - 1);
 
-    const { data: rows, error, count } = await query;
+    let { data: rows, error, count } = await query;
+
+    // Fallback: if profiles join fails, retry without it
+    if (error && error.message?.includes("profiles")) {
+      let fallback = supabase
+        .from("feedback")
+        .select(
+          `id, user_id, title, body, rating, category, visibility, status, helpful_count, created_at, updated_at`,
+          { count: "exact" },
+        )
+        .eq("visibility", "public")
+        .eq("status", "published");
+
+      if (data.authorId) fallback = fallback.eq("user_id", data.authorId);
+      if (data.category !== "all") fallback = fallback.eq("category", data.category);
+      if (data.search) fallback = fallback.or(`title.ilike.%${data.search}%,body.ilike.%${data.search}%`);
+
+      switch (data.sort) {
+        case "newest": fallback = fallback.order("created_at", { ascending: false }); break;
+        case "highest": fallback = fallback.order("rating", { ascending: false }).order("created_at", { ascending: false }); break;
+        case "lowest": fallback = fallback.order("rating", { ascending: true }).order("created_at", { ascending: false }); break;
+        case "helpful": fallback = fallback.order("helpful_count", { ascending: false }).order("created_at", { ascending: false }); break;
+      }
+
+      fallback = fallback.range(offset, offset + data.pageSize - 1);
+      const fb = await fallback;
+      rows = fb.data;
+      count = fb.count;
+      error = fb.error;
+    }
+
     if (error) throw new Error(error.message);
 
     return {

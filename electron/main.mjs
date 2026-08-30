@@ -666,7 +666,11 @@ if (!gotLock) {
     // Desktop OAuth IPC — invoked from the renderer via the preload bridge.
     // The system browser does the Google dance; this process never renders it.
     ipcMain.handle("zeus-desktop:oauth:start-google", async (event) => {
-      if (!isTrustedSender(event)) return { error: "Unauthorized caller." };
+      if (!isTrustedSender(event)) {
+        const frameUrl = (() => { try { return event.senderFrame?.url ?? "unknown"; } catch { return "error"; } })();
+        console.error("[oauth] rejected: untrusted sender. frameUrl:", frameUrl, "mainWindow:", !!mainWindow);
+        return { error: "Unauthorized caller. Please restart the desktop app and try again." };
+      }
       if (pendingOAuth) return { error: "A sign-in is already in progress." };
       // Fail fast if the build has no Supabase env — the page and the code
       // exchange need it, so there's no point opening the browser.
@@ -676,6 +680,7 @@ if (!gotLock) {
       const { verifier, challenge } = generatePkcePair();
       pendingOAuth = { verifier, expiresAt: Date.now() + OAUTH_TTL_MS };
       const url = buildDesktopAuthPageUrl(challenge);
+      console.log("[oauth] opening browser:", url);
       try {
         await shell.openExternal(url);
       } catch (err) {
