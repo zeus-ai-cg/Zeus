@@ -6,7 +6,6 @@ import {
   Github,
   Instagram,
   Linkedin,
-  Twitter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthSession } from "@/lib/auth-session";
@@ -130,15 +129,6 @@ export function MarketingFooter() {
             ⚡ Upload. ⚡ Analyze. ⚡ Ship. Your AI Software Engineering Workspace — available 24/7.
           </p>
           <div className="mt-4 flex gap-3 text-muted-foreground">
-            <a
-              href="https://x.com/CodeMasterAI_"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="X (Twitter)"
-              className="hover:text-foreground"
-            >
-              <Twitter className="size-4" />
-            </a>
             <a
               href="https://github.com/zeus-ai-cg/Zeus"
               target="_blank"

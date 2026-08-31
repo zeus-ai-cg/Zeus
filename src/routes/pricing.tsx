@@ -18,13 +18,13 @@ export const Route = createFileRoute("/pricing")({
       {
         name: "description",
         content:
-          "Simple, transparent pricing. Free forever plan, Pro at $5/month for 5,000 questions/month, and Ultimate at $10/month with no Fair Usage Policy.",
+          "Simple, transparent pricing. Free forever plan, Pro at $5/month for 5,000 requests/month, and Ultimate at $10/month with no Fair Usage Policy.",
       },
       { property: "og:title", content: "Pricing — Zeus AI" },
       {
         property: "og:description",
         content:
-          "Simple, transparent pricing. Free forever plan, Pro at $5/month for 5,000 questions/month, and Ultimate at $10/month with no Fair Usage Policy.",
+          "Simple, transparent pricing. Free forever plan, Pro at $5/month for 5,000 requests/month, and Ultimate at $10/month with no Fair Usage Policy.",
       },
       { property: "og:url", content: `${SITE_URL}/pricing` },
     ],
@@ -36,10 +36,10 @@ export const Route = createFileRoute("/pricing")({
 const FREE = ["15 questions", "Reset every 24 hours"];
 
 const PRO = [
-  "5,000 questions / month",
-  "Deep Learning Mode",
-  "Research Mode",
-  "Image Generation",
+  "5,000 requests / month",
+  "Unlimited Engineer Mode runs",
+  "AI Code Review + Health Score",
+  "VS Code extension included",
   "Priority Responses",
 ];
 
@@ -98,7 +98,9 @@ function Pricing() {
             Most popular
           </div>
           <h3 className="text-2xl font-semibold">Pro</h3>
-          <p className="text-sm text-muted-foreground mt-1">For serious learners & builders</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            For teams shipping real codebases
+          </p>{" "}
           <div className="mt-6 flex items-baseline gap-1">
             <span className="text-5xl font-bold">$5</span>
             <span className="text-muted-foreground">/ month</span>
@@ -163,11 +165,10 @@ function Pricing() {
           <Link to="/terms" className="text-primary hover:underline">
             Fair Usage Policy
           </Link>
-          ), all advanced learning modes, multimedia uploads (voice, images, files), unlimited chat
-          history, and priority response times. We bill monthly via Lemon Squeezy — your
-          subscription renews automatically each month and can be cancelled instantly from your
-          billing dashboard. Subscription stops at the end of the current period; no further
-          charges.
+          ), unlimited Engineer Mode runs, AI Code Review with a project Health Score, the VS Code
+          extension, and priority responses. We bill monthly via Lemon Squeezy — your subscription
+          renews automatically each month and can be cancelled instantly from your billing
+          dashboard. Subscription stops at the end of the current period; no further charges.
         </p>
         <div className="mt-6 flex justify-center gap-3 flex-wrap text-sm">
           <Link to="/refund" className="text-primary hover:underline">

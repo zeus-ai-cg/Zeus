@@ -42,7 +42,7 @@ function Contact() {
     const body = encodeURIComponent(
       `Name: ${form.get("name")}\nEmail: ${form.get("email")}\n\n${form.get("message")}`,
     );
-    window.location.href = `mailto:Haidersiddique0909@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:zeus.ai328@gmail.com?subject=${subject}&body=${body}`;
     setTimeout(() => {
       setSending(false);
       toast.success("Opening your email client…");
@@ -61,14 +61,14 @@ function Contact() {
         <InfoCard
           icon={<Mail className="size-5" />}
           title="Support"
-          value="Haidersiddique0909@gmail.com"
-          href="mailto:Haidersiddique0909@gmail.com"
+          value="zeus.ai328@gmail.com"
+          href="mailto:zeus.ai328@gmail.com"
         />
         <InfoCard
           icon={<Briefcase className="size-5" />}
           title="Business"
-          value="Haidersiddique0909@gmail.com"
-          href="mailto:Haidersiddique0909@gmail.com"
+          value="zeus.ai328@gmail.com"
+          href="mailto:zeus.ai328@gmail.com"
         />
         <InfoCard icon={<Clock className="size-5" />} title="Response time" value="24–48 hours" />
       </section>

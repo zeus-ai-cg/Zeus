@@ -25,7 +25,7 @@ export const Route = createFileRoute("/privacy")({
 });
 
 function Privacy() {
-  const updated = "July 5, 2026";
+  const updated = "August 31, 2026";
   return (
     <MarketingLayout>
       <PageHero eyebrow="Legal" title="Privacy Policy" subtitle={`Last updated: ${updated}`} />
@@ -48,7 +48,7 @@ function Privacy() {
             Your display name, and any optional profile fields you choose to add (full name, age,
             nationality, avatar image).
           </li>
-          <li>Your subscription plan (Standard or Pro) and billing status.</li>
+          <li>Your subscription plan (Free, Pro, or Ultimate) and billing status.</li>
         </ul>
         <h3>1.2 Conversation history</h3>
         <ul>
@@ -61,22 +61,23 @@ function Privacy() {
         <h3>1.3 Uploaded images and files</h3>
         <ul>
           <li>
-            Images (e.g. screenshots of code, error messages, or UI mockups) and text/code/PDF files
-            you attach to a conversation. These are sent directly to Google's Gemini API as part of
-            your prompt so the AI can read and respond to them, and the resulting message (including
-            the attachment) is stored in your conversation history in the same way as text messages.
+            Images (e.g. screenshots of code, error messages, or UI mockups), project ZIPs, and
+            text/code/PDF files you attach to a conversation or upload to the Workspace. These are
+            sent to the AI provider processing your request so the AI can read and respond to them,
+            and the resulting conversation (including the attachment) is stored in your account in
+            the same way as text messages.
           </li>
         </ul>
         <h3>1.4 Usage data and analytics</h3>
         <ul>
           <li>
-            Question counts and timestamps, used to enforce the free-plan limit (15 questions / 24
+            Request counts and timestamps, used to enforce the free-plan limit (15 questions / 24
             hours) and the Zeus AI Pro Fair Usage Policy (see our{" "}
             <a href="/terms">Terms of Service</a>).
           </li>
           <li>
-            Learning activity such as your streak and selected learning mode — used only to power
-            in-app features like your dashboard.
+            Workspace activity such as your chosen model provider and project usage — used only to
+            power in-app features like your dashboard.
           </li>
           <li>
             Basic technical metadata (e.g. request timestamps, coarse error logs) used for security,
@@ -87,12 +88,15 @@ function Privacy() {
 
         <h2>2. AI processing disclaimer</h2>
         <p>
-          When you send a message, Zeus AI forwards your conversation (including any attached images
-          or files) to Google's Gemini API to generate a response. Google processes this content
-          solely to return an answer to your prompt; see Google's own privacy terms for how Google
-          itself handles API data. AI-generated responses may be inaccurate or incomplete — always
-          verify anything important, especially code you plan to run or rely on. Zeus AI does not
-          use your conversations to train third-party foundation models.
+          When you send a message, Zeus AI forwards your conversation (including any attached
+          images, files, or uploaded project data) to an AI provider to generate a response. By
+          default this is Google's Gemini API, with Ox Alpha used as the fallback provider. If you
+          connect your own model keys (Bring Your Own Key), your request is sent to whichever
+          provider you selected. Each provider processes your content solely to return an answer to
+          your prompt; see that provider's own privacy terms for how it handles API data.
+          AI-generated responses may be inaccurate or incomplete — always verify anything important,
+          especially code you plan to run or rely on. Zeus AI does not use your conversations to
+          train third-party foundation models.
         </p>
 
         <h2>3. Cookies and local storage</h2>
@@ -117,6 +121,11 @@ function Privacy() {
             API keys and secrets are stored as environment variables in our hosting provider, never
             committed to source code.
           </li>
+          <li>
+            Bring-your-own (BYOK) model keys are encrypted at rest with AES-256-GCM and decrypted
+            only in server memory for the duration of a request; we store only the last four digits
+            of each key, and the raw key is never returned to your browser.
+          </li>
           <li>Access to production data is limited to what's operationally necessary.</li>
         </ul>
 
@@ -128,9 +137,14 @@ function Privacy() {
             profile, and conversation data.
           </li>
           <li>
-            <strong>Google</strong> — Google Sign-In (authentication) and the Gemini API (AI model
-            that generates responses to your prompts, including analyzing any images/files you
-            attach).
+            <strong>Google</strong> — Google Sign-In (authentication) and the Gemini API (the
+            default AI model that generates responses to your prompts, including analyzing any
+            images/files you attach). We also use Ox Alpha as a fallback provider.
+          </li>
+          <li>
+            <strong>Bring-your-own providers</strong> — if you add your own keys, requests may
+            additionally be routed to OpenAI, Anthropic Claude, OpenRouter, Groq, DeepSeek, Mistral,
+            or Ox Alpha according to the provider you select.
           </li>
           <li>
             <strong>Lemon Squeezy</strong> — our payment processor for Zeus AI Pro and Ultimate
@@ -156,9 +170,9 @@ function Privacy() {
         <p>
           You can request deletion of your account and associated data at any time from{" "}
           <strong>Settings → Delete account</strong>, or by emailing{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a> with the
-          subject line "Data deletion request" from the email address on your account. We will
-          confirm and process the request within 30 days.
+          <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a> with the subject line "Data
+          deletion request" from the email address on your account. We will confirm and process the
+          request within 30 days.
         </p>
 
         <h2>8. Your rights</h2>
@@ -187,8 +201,7 @@ function Privacy() {
         </ul>
         <p>
           To exercise any of these rights, email{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a>. We respond
-          within 30 days.
+          <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a>. We respond within 30 days.
         </p>
 
         <h2>9. Children's privacy</h2>
@@ -215,7 +228,7 @@ function Privacy() {
         <h2>12. Contact</h2>
         <p>
           Questions about this policy or your data? Email{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a>.
+          <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a>.
         </p>
       </Prose>
     </MarketingLayout>

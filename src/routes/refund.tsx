@@ -53,7 +53,7 @@ function Refund() {
         <Highlight
           icon={<Mail className="size-5" />}
           title="Request via email"
-          desc="Send your request to Haidersiddique0909@gmail.com with your account email and reason (optional)."
+          desc="Send your request to zeus.ai328@gmail.com with your account email and reason (optional)."
         />
       </section>
 
@@ -70,7 +70,7 @@ function Refund() {
         <h2>How to request a refund</h2>
         <ol>
           <li>
-            Email <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a>{" "}
+            Email <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a>{" "}
             from the address tied to your account.
           </li>
           <li>
@@ -141,7 +141,7 @@ function Refund() {
         <p>
           Questions before you subscribe, or about an existing charge? Visit our{" "}
           <a href="/faq">FAQ</a>, or email{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a>.
+          <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a>.
         </p>
       </Prose>
     </MarketingLayout>

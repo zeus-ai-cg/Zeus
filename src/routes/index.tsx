@@ -18,6 +18,9 @@ import {
   Diff,
   Gauge,
   GitBranch,
+  KeyRound,
+  Server,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthSession } from "@/lib/auth-session";
@@ -29,24 +32,29 @@ import { useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Zeus AI — Your AI Software Engineer" },
+      { title: "Zeus AI — Your AI Software Engineering Workspace" },
       {
         name: "description",
         content:
-          "Zeus AI is an AI Software Engineering Workspace: upload your project, chat with it, generate features, review code, and ship changes with AI that understands your whole codebase.",
+          "Zeus AI is an AI Software Engineering Workspace: upload your project, and it indexes your codebase so you can analyze it, chat with it, generate features, review code, and ship real diffs — with engineering tools, native desktop and VS Code apps.",
       },
-      { property: "og:title", content: "Zeus AI — Your AI Software Engineer" },
+      {
+        name: "keywords",
+        content:
+          "AI software engineer, AI coding, codebase indexing, AI code review, feature generator, AI engineer workspace, bring your own key, Zeus AI",
+      },
+      { property: "og:title", content: "Zeus AI — Your AI Software Engineering Workspace" },
       {
         property: "og:description",
         content:
-          "Zeus AI is an AI Software Engineering Workspace: upload your project, chat with it, generate features, review code, and ship changes with AI that understands your whole codebase.",
+          "Upload your project and Zeus AI indexes how it's built — then analyze, chat, generate features, review code, and ship real diffs from one Workspace.",
       },
       { property: "og:url", content: `${SITE_URL}/` },
-      { name: "twitter:title", content: "Zeus AI — Your AI Software Engineer" },
+      { name: "twitter:title", content: "Zeus AI — Your AI Software Engineering Workspace" },
       {
         name: "twitter:description",
         content:
-          "Upload your project, chat with it, generate features, and ship changes with an AI Software Engineering Workspace.",
+          "An AI Software Engineering Workspace that indexes your project and ships real, reviewable diffs — desktop + VS Code.",
       },
     ],
     links: [{ rel: "canonical", href: `${SITE_URL}/` }],
@@ -114,18 +122,18 @@ const features = [
 const howItWorks = [
   {
     icon: FolderTree,
-    title: "Upload your project",
-    desc: "Drop in a project ZIP (or connect from the Workspace) and Zeus AI indexes its structure, framework and dependencies.",
+    title: "Upload & index your project",
+    desc: "Drop in a project ZIP and Zeus AI builds a map of its structure, entry points, framework and dependencies — so the model reasons about your real code, not guesses.",
   },
   {
     icon: MessageSquare,
-    title: "Chat & analyze",
-    desc: "Ask where something lives, how it works, or what's risky — grounded in your actual code.",
+    title: "Chat, analyze & review",
+    desc: "Ask where something lives, how it works, or what's risky. Zeus AI answers grounded in the indexed codebase and runs an AI code review with a Health Score.",
   },
   {
     icon: GitBranch,
-    title: "Review & ship",
-    desc: "Get real diffs, a health score and generated commits you can review, roll back or export.",
+    title: "Generate, review & ship",
+    desc: "Generate features or ask for a change, inspect a real diff, roll back if needed, and export the result as a ZIP — or drive commits and PR descriptions.",
   },
 ];
 
@@ -172,11 +180,19 @@ const capabilities = [
 const faqs = [
   {
     q: "How many free questions do I get?",
-    a: "Every free account gets 15 questions per 24 hours. The counter resets automatically.",
+    a: "Every free account gets 15 questions per 24 hours. The counter resets automatically, and free users get the full Workspace including project upload, indexing, chat, and one Engineer Mode project.",
+  },
+  {
+    q: "Does Zeus AI really understand my project?",
+    a: "Yes — when you upload a project it's indexed first: structure, entry points, framework and dependencies. Chat, review, and feature generation then reason against that indexed map instead of guessing.",
+  },
+  {
+    q: "How are my API keys handled?",
+    a: "Bring-your-own keys are encrypted at rest using AES-256-GCM and decrypted in server memory only for the duration of a request. We only store the last four digits, and the raw key is never returned to your browser.",
   },
   {
     q: "What's in the Pro plan?",
-    a: "5,000 requests/month, higher usage limits across Workspace features, unlimited history, and priority responses.",
+    a: "5,000 requests per month, unlimited Engineer Mode runs, AI Code Review with Health Score, the VS Code extension, and priority responses.",
   },
   {
     q: "Can I cancel anytime?",
@@ -184,7 +200,7 @@ const faqs = [
   },
   {
     q: "Do you offer refunds?",
-    a: "30-day money-back guarantee on Pro. Email Haidersiddique0909@gmail.com.",
+    a: "30-day money-back guarantee on Pro. Email zeus.ai328@gmail.com.",
   },
 ];
 
@@ -199,15 +215,15 @@ function Landing() {
         <div className="max-w-6xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-2 gap-12 items-center relative">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-3 py-1 text-xs text-muted-foreground mb-6">
-              <Sparkles className="size-3 text-accent" /> Built by an indie developer
+              <Sparkles className="size-3 text-accent" /> An AI Software Engineering Workspace
             </div>
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-              Your <span className="text-gradient">AI Software Engineer</span>, available 24/7.
+              Your <span className="text-gradient">AI Software Engineer</span> for real codebases.
             </h1>
             <p className="mt-6 text-lg text-muted-foreground max-w-xl">
-              Zeus AI is an AI Software Engineering Workspace — upload your project, analyze it,
-              generate features, review code, and ship changes with AI that understands your whole
-              codebase.
+              Upload (or point us at) your project and Zeus AI indexes it, maps how it's built, and
+              gives you an AI engineer who can analyze, chat, review, and ship real changes — with
+              diffs you review before anything is applied.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button
@@ -216,8 +232,8 @@ function Landing() {
                 asChild
               >
                 <Link to={isAuthenticated ? "/dashboard" : "/auth"}>
-                  <MessageSquare className="size-4 mr-2" />{" "}
-                  {isAuthenticated ? "Open dashboard" : "Start free"}
+                  <Rocket className="size-4 mr-2" />{" "}
+                  {isAuthenticated ? "Open your Workspace" : "Launch Free Workspace"}
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
@@ -226,8 +242,9 @@ function Landing() {
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <span>✓ Free forever plan</span>
-              <span>✓ Bring your own keys</span>
-              <span>✓ No credit card</span>
+              <span>✓ Bring your own model keys</span>
+              <span>✓ No credit card to start</span>
+              <span>✓ Native desktop + VS Code</span>
             </div>
           </div>
           <div className="relative">
@@ -263,6 +280,15 @@ function Landing() {
 
       {/* How Zeus works with your project */}
       <section className="max-w-5xl mx-auto px-6 py-20">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            From uploaded project to shipped change
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            Zeus AI works on code it actually understands — indexed from your project and reviewed
+            before it touches anything.
+          </p>
+        </div>
         <div className="grid md:grid-cols-3 gap-4">
           {howItWorks.map((step, i) => (
             <div key={step.title} className="rounded-xl border border-border bg-card/60 p-6">
@@ -370,6 +396,48 @@ function Landing() {
         </div>
       </section>
 
+      {/* Security & BYOK */}
+      <section id="security" className="max-w-6xl mx-auto px-6 py-20">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            Your code and keys stay under your control
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            Zeus AI ships with a ready-to-use model (Google Gemini, with Ox Alpha as the fallback),
+            or bring your own keys and pick the model that fits each task.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <SecurityCard
+            icon={<ShieldCheck className="size-5 text-primary-foreground" />}
+            title="Encrypted, server-side keys"
+            desc="Bring-your-own-keys are encrypted at rest with AES-256-GCM and decrypted in server memory only when a request runs — never returned to your browser."
+          />
+          <SecurityCard
+            icon={<KeyRound className="size-5 text-primary-foreground" />}
+            title="Pick your model"
+            desc="Use the built-in Gemini (powered by Google AI) or connect OpenAI, Anthropic Claude, OpenRouter, Groq, DeepSeek, Mistral, or Ox Alpha."
+          />
+          <SecurityCard
+            icon={<Server className="size-5 text-primary-foreground" />}
+            title="Grounding in your project"
+            desc="Answers are grounded in the code you upload, and every change lands as a diff you review, roll back, or export before it ships."
+          />
+        </div>
+        <p className="mt-8 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+          Traffic is served over HTTPS and each account's data is isolated with row-level security.
+          We never sell your data or your projects. See the{" "}
+          <Link to="/privacy" className="text-primary hover:underline">
+            Privacy Policy
+          </Link>{" "}
+          and{" "}
+          <Link to="/terms" className="text-primary hover:underline">
+            Terms
+          </Link>
+          .
+        </p>
+      </section>
+
       {/* Desktop + VS Code */}
       <section className="max-w-5xl mx-auto px-6 py-20">
         <div className="grid md:grid-cols-2 gap-5">
@@ -407,14 +475,23 @@ function Landing() {
           </h2>
           <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
             We don't run paid reviews or testimonials. Instead of taking our word for it, upload a
-            project and see the diffs, health score, and workspace tools yourself — free to start.
+            project and see the diffs, health score, and workspace tools yourself — or browse real
+            feedback from people who already have.
           </p>
-          <a
-            href="/auth"
-            className="mt-8 inline-flex items-center justify-center rounded-md bg-gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow"
-          >
-            Start free
-          </a>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <a
+              href="/auth"
+              className="inline-flex items-center justify-center rounded-md bg-gradient-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-glow"
+            >
+              Start free
+            </a>
+            <Link
+              to="/Feedback"
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card/60 px-6 py-3 text-sm font-medium hover:border-primary/50 hover:shadow-glow transition-all"
+            >
+              Browse public feedback →
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -428,16 +505,18 @@ function Landing() {
           <PricingCard
             name="Free"
             price="$0"
-            tagline="Perfect to get started"
+            period="forever"
+            tagline="Try the full Workspace"
             features={[
               "15 questions per 24 hours",
-              "Beginner mode",
-              "Chat history",
-              "Coding explanations",
+              "Upload & index a project",
+              "Chat with your codebase",
+              "Bring your own model keys",
+              "1 free Engineer Mode project",
             ]}
             cta={
               <Button variant="outline" className="w-full" asChild>
-                <Link to="/auth">Start free</Link>
+                <Link to="/auth">Launch Free Workspace</Link>
               </Button>
             }
           />
@@ -446,13 +525,12 @@ function Landing() {
             price="$5"
             period="/ month"
             highlight
-            tagline="For serious learners"
+            tagline="For teams shipping full products"
             features={[
-              "5,000 questions/month",
-              "Deep Learning + Research mode",
-              "Project Mentor mode",
-              "Voice, file & image uploads",
-              "Unlimited history",
+              "5,000 requests per month",
+              "Unlimited Engineer Mode",
+              "AI Code Review + Health Score",
+              "VS Code extension",
               "Priority responses",
             ]}
             cta={
@@ -663,6 +741,26 @@ function PlatformCard({
       <Button variant="outline" className="mt-6" asChild>
         <Link to={cta.to}>{cta.label}</Link>
       </Button>
+    </div>
+  );
+}
+
+function SecurityCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card/60 p-6 hover:border-primary/50 hover:shadow-glow transition-all">
+      <div className="size-10 rounded-lg bg-gradient-primary grid place-items-center mb-4 shadow-glow">
+        {icon}
+      </div>
+      <h3 className="font-semibold mb-1">{title}</h3>
+      <p className="text-sm text-muted-foreground">{desc}</p>
     </div>
   );
 }

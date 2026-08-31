@@ -95,7 +95,7 @@ function SettingsPage() {
 
   const handleDelete = async () => {
     try {
-      toast.info("Deletion requested. Email Haidersiddique0909@gmail.com to complete.");
+      toast.info("Deletion requested. Email zeus.ai328@gmail.com to complete.");
       await signOutAndClearAuth(qc);
       navigate({ to: "/auth", replace: true });
     } catch (error: unknown) {

@@ -777,7 +777,7 @@ export const confirmFeedbackUpload = createServerFn({ method: "POST" })
 // ADMIN FUNCTIONS (hidden moderation — only for admin users)
 // ============================================================================
 
-const ADMIN_EMAIL = "haidersiddique0909@gmail.com";
+const ADMIN_EMAIL = "zeus.ai328@gmail.com";
 
 async function checkIsAdmin(supabase: AnySupabase, userId: string): Promise<boolean> {
   const { data } = await supabase

@@ -216,7 +216,7 @@ export const Route = createFileRoute("/api/chat")({
               return new Response(
                 JSON.stringify({
                   error: "fair_usage_limit_reached",
-                  message: `You've reached Zeus AI Pro's Fair Usage Policy limit of ${PRO_MONTHLY_REQUEST_LIMIT.toLocaleString()} requests for this billing cycle. Your limit resets on ${resetAt.toLocaleDateString()}. Need a higher limit? Reach out to Haidersiddique0909@gmail.com.`,
+                  message: `You've reached Zeus AI Pro's Fair Usage Policy limit of ${PRO_MONTHLY_REQUEST_LIMIT.toLocaleString()} requests for this billing cycle. Your limit resets on ${resetAt.toLocaleDateString()}. Need a higher limit? Reach out to zeus.ai328@gmail.com.`,
                   reset_at: resetAt.toISOString(),
                 }),
                 { status: 429, headers: { "Content-Type": "application/json" } },

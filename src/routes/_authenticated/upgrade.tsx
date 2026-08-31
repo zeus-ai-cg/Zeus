@@ -88,13 +88,12 @@ function Upgrade() {
               </div>
               <ul className="mt-5 space-y-2 text-sm">
                 {[
-                  "5,000 questions / month",
-                  "Advanced explanations & deep learning mode",
-                  "Extended code reviews",
+                  "5,000 requests / month",
+                  "Advanced Engineer & Project Mentor modes",
+                  "AI Code Review + Health Score",
+                  "Unlimited Engineer Mode runs",
                   "Large project planning & architecture",
                   "Priority responses",
-                  "Advanced interview preparation",
-                  "Personalized learning roadmaps",
                 ].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="size-4 text-primary mt-0.5" />

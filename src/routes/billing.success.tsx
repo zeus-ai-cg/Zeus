@@ -17,8 +17,8 @@ function Success() {
         </div>
         <h1 className="text-4xl font-bold">You're in. Welcome to ⚡ Zeus AI Pro</h1>
         <p className="mt-4 text-muted-foreground">
-          Payment confirmed. Your Pro features are unlocking — unlimited questions, Deep Learning
-          Mode, Research Mode, image generation, and priority responses.
+          Payment confirmed. Your Pro features are unlocking — unlimited Engineer Mode runs, AI Code
+          Review with a project Health Score, the VS Code extension, and priority responses.
         </p>
         <div className="mt-8 flex justify-center gap-3">
           <Button className="bg-gradient-primary text-primary-foreground shadow-glow" asChild>
@@ -31,8 +31,8 @@ function Success() {
         <p className="mt-10 text-xs text-muted-foreground">
           A receipt has been emailed to you by Lemon Squeezy. It may take up to a minute for Pro to
           appear in your account. Still not showing after a few minutes? Email{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com" className="text-primary hover:underline">
-            Haidersiddique0909@gmail.com
+          <a href="mailto:zeus.ai328@gmail.com" className="text-primary hover:underline">
+            zeus.ai328@gmail.com
           </a>{" "}
           with your account email and we'll sort it out.
         </p>

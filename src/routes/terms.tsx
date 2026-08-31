@@ -134,7 +134,7 @@ function Terms() {
           </li>
           <li>
             If your team or use case genuinely needs a higher limit, contact{" "}
-            <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a> — we're
+            <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a> — we're
             happy to discuss it.
           </li>
         </ul>
@@ -203,7 +203,7 @@ function Terms() {
         <h2>13. Contact</h2>
         <p>
           Questions about these Terms? Email{" "}
-          <a href="mailto:Haidersiddique0909@gmail.com">Haidersiddique0909@gmail.com</a>.
+          <a href="mailto:zeus.ai328@gmail.com">zeus.ai328@gmail.com</a>.
         </p>
       </Prose>
     </MarketingLayout>
